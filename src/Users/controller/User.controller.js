@@ -31,3 +31,11 @@ export const updateuserBYid = catchsync(async(req ,res)=>{
     res.status(200).json({message:"User updated",user})
 }
 )
+ export const deleteuserBYid = catchsync(async(req ,res)=>{
+    let user = await UserModel.findByIdAndDelete(req.params.id)
+    if(!user){
+        return next(new AppError("No user found with this id",404))
+    }
+    res.status(200).json({message:"User deleted",user})
+}
+)

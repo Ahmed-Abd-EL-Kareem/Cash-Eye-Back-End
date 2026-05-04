@@ -68,7 +68,7 @@ app.use(hpp());
 
 app.use('/api', globalLimiter);
 
-app.use("/users", userRout)
+app.use("/api/v1/users", userRout)
 
 app.use(/.*/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));
