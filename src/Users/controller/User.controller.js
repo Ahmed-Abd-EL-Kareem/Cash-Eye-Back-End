@@ -24,7 +24,8 @@ export const getuserBYid = catchsync(async(req ,res)=>{
 )
 
 export const updateuserBYid = catchsync(async(req ,res)=>{
-    let user = await UserModel.findByIdAndUpdate(req.params.id,req.body,{new:true})
+    let{name,image,password} = req.body
+    let user = await UserModel.findByIdAndUpdate(req.params.id,{name,image,password},{new:true})
     if(!user){
         return next(new AppError("No user found with this id",404))
     }
