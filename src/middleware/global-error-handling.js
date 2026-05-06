@@ -7,15 +7,13 @@ const handleDuplicateFieldsDB = (err) => {
 
 const sendErrorDev = (err, req, res) => {
   console.error("ERROR 💥💥💥: ", err);
-  // Send response for both /api and /auth routes
-  if (req.originalUrl.startsWith("/api") || req.originalUrl.startsWith("/auth")) {
-    return res.status(err.statusCode).json({
-      status: err.status,
-      error: err,
-      message: err.message,
-      stack: err.stack
-    });
-  }
+  // Send response for all routes
+  return res.status(err.statusCode).json({
+    status: err.status,
+    error: err,
+    message: err.message,
+    stack: err.stack
+  });
 }
 
 export const globalErrorHandler = (err, req, res, next) => {

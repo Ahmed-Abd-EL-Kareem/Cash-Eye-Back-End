@@ -11,6 +11,8 @@ import xss from 'xss'
 import { globalLimiter } from "./src/middleware/rate-limit.middleware.js";
 import { globalErrorHandler } from "./src/middleware/global-error-handling.js";
 import { sanitize as sanitizeMongo } from 'express-mongo-sanitize'
+import IndexRoutes from "./src/routes/index.js";
+import AppError from "./src/utils/appError.js";
 const app = express()
 
 
@@ -65,7 +67,7 @@ app.use((req, res, next) => {
 app.use(hpp());
 
 app.use('/api', globalLimiter);
-
+app.use('/api/v1', IndexRoutes);
 
 app.use(/.*/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));
