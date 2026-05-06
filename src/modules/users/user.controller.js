@@ -4,7 +4,6 @@ import UserModel from "./user.model.js"
 
 const getAllUsers = catchAsync(async (req, res) => {
   let user = await UserModel.find()
-  res.status(200).json({ status: "success", length: user.length, user })
 })
 
 const createUser = catchAsync(async (req, res) => {
