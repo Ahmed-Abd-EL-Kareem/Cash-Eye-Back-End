@@ -13,6 +13,8 @@ import { globalErrorHandler } from "./src/middleware/global-error-handling.js";
 import { sanitize as sanitizeMongo } from 'express-mongo-sanitize'
 import userRout from "./src/routes/user.routes.js"
 import AppError from "./src/utils/appError.js";
+import authRoutes from "./src/routes/auth.routes.js";
+
 const app = express()
 
 
@@ -24,10 +26,11 @@ if (process.env.NODE_ENV === "development") {
 app.use(cors(
 ));
 app.use(express.json())
+// ========signup======
+app.use("/api/v1/auth", authRoutes);
 app.use(cookieParser());
 app.use(helmet())
 app.use(compression())
-// Data sanitization against NoSQL query injection (Express 5–compatible: cannot assign req.query)
 app.use((req, res, next) => {
   if (req.body) req.body = sanitizeMongo(req.body)
   if (req.params && Object.keys(req.params).length) sanitizeMongo(req.params)
@@ -41,7 +44,6 @@ app.use((req, res, next) => {
   next()
 })
 
-// Data sanitization against XSS (sanitize strings inside body/query/params)
 app.use((req, res, next) => {
   const sanitizeValue = (value) => {
     if (typeof value === "string") return xss(value);
@@ -63,7 +65,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Prevent Parameter Pollution attacks
 app.use(hpp());
 
 app.use('/api', globalLimiter);
