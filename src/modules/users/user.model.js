@@ -6,7 +6,11 @@ const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+<<<<<<< HEAD
     trim: true.valueOf,
+=======
+    trim: true,
+>>>>>>> 63d9c01 (Add Subscription & SignUp)
     validate: {
       validator: function (v) {
         return /^[a-zA-Z\s]+$/.test(v);
@@ -69,21 +73,37 @@ const userSchema = new mongoose.Schema({
     default: "user",
   },
   subscription: {
+<<<<<<< HEAD
     type: String,
     enum: ["free", "premium"],
     default: "free",
   }
+=======
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Subscription",
+  },
+  otp: String,
+  resetOTPExpiration: Date
+>>>>>>> 63d9c01 (Add Subscription & SignUp)
 },
   {
     timestamps: true,
   },
 );
 
+<<<<<<< HEAD
 userSchema.pre("save", async function () {
   if (!this.isModified("password") || !this.password) {
     return next();
   } else {
     this.password = await bcrypt.hash(this.password, 8);
+=======
+userSchema.pre("save", async function (_, next) {
+  if (!this.isModified("password") || !this.password) {
+    return;
+  } else {
+    this.password = await bcrypt.hash(this.password, 12);
+>>>>>>> 63d9c01 (Add Subscription & SignUp)
   }
 });
 const UserModel = mongoose.model("User", userSchema);

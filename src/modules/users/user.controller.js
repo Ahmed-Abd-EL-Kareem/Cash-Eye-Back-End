@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { catchAsync } from "../../utils/catchAsync.js"
 import AppError from "../../utils/appError.js"
 import UserModel from "./user.model.js"
@@ -45,3 +46,26 @@ export default {
   updateUserById,
   deleteUserById
 }
+=======
+import { createUser, getAllUsers, getUserById, updateUserById, deleteUserById } from "./user.service.js";
+const createUsers = (req, res, next) => {
+  return createUser(req, res, next)
+};
+
+const getUsers = (req, res, next) => {
+  return getAllUsers(req, res, next)
+};
+
+const getUser = (req, res, next) => {
+  return getUserById(req, res, next)
+}
+
+const updateUser = (req, res, next) => {
+  return updateUserById(req, res, next)
+}
+
+const deleteUser = (req, res, next) => {
+  return deleteUserById(req, res, next)
+}
+export { createUsers, getUsers, getUser, updateUser, deleteUser }
+>>>>>>> 63d9c01 (Add Subscription & SignUp)

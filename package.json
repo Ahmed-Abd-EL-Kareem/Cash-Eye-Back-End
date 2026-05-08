@@ -23,6 +23,10 @@
     "express-rate-limit": "^8.4.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
+<<<<<<< HEAD
+=======
+    "jsonwebtoken": "^9.0.3",
+>>>>>>> 63d9c01 (Add Subscription & SignUp)
     "mongoose": "^9.6.1",
     "morgan": "^1.10.1",
     "nodemailer": "^8.0.7",
