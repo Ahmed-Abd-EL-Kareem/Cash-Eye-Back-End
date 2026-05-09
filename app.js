@@ -1,6 +1,8 @@
 import express from "express";
-import dotenv from 'dotenv'
-dotenv.config({ path: './.development.env' })
+import dotenv from "dotenv";
+dotenv.config()
+// dotenv.config({path: "./.env"});
+// dotenv.config({ path: "./.env" });
 import morgan from "morgan";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -13,16 +15,64 @@ import { globalErrorHandler } from "./src/middleware/global-error-handling.js";
 import { sanitize as sanitizeMongo } from 'express-mongo-sanitize'
 import IndexRoutes from "./src/routes/index.js";
 import AppError from "./src/utils/appError.js";
+/////////////// Hala //////////////
+import session from "express-session";
+
+import passport
+from "./src/config/passport.js";
+
+
+// dotenv.config({ path: "./.development.env" });
+
 const app = express()
 
 
 //! Middleware
-console.log("NODE_ENV", process.env.NODE_ENV);
+// console.log("NODE_ENV", process.env.NODE_ENV);
+console.log("NODE_ENV",process.env.NODE_ENV);
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
-app.use(cors(
-));
+////////Hala////////
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  credentials: true
+}));
+
+app.use(express.json());
+
+app.use(express.urlencoded({
+  extended: true
+}));
+
+app.use(cookieParser());
+
+app.use(session({
+
+  secret: process.env.SESSION_SECRET,
+
+  resave: false,
+
+  saveUninitialized: false
+
+}));
+
+app.use(passport.initialize());
+
+app.use(passport.session());
+////////Hala////////
+
+
+
+
+
+
+
+
+
+
+
+
 app.use(express.json())
 app.use(cookieParser());
 app.use(helmet())

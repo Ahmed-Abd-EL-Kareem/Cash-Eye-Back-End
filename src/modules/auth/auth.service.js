@@ -6,6 +6,10 @@ import AppError from "../../utils/appError.js"
 import { catchAsync } from '../../utils/catchAsync.js'
 import { generateRandomNumber } from "../../utils/generateOTP.js";
 import { sendEmail } from "../../utils/email.js";
+////////Hala////////
+// import bcrypt from "bcryptjs";
+import User from "../users/user.model.js";
+// import AppError from "../../utils/appError.js";
 
 
 export const forgotPassword = catchAsync(async (req, res) => {
@@ -41,6 +45,7 @@ export const forgotPassword = catchAsync(async (req, res) => {
     res.status(500).json({ message: "Error sending email. Try again later." });
   }
 });
+
 export const resetPassword = catchAsync(async (req, res) => {
   const { newPassword, email, otp } = req.body;
 
@@ -67,3 +72,41 @@ export const resetPassword = catchAsync(async (req, res) => {
 
   res.status(200).json({ message: "Password successfully reset" });
 });
+
+/////////////Hala//////////////
+
+
+export const loginService = async (
+  email,
+  password
+) => {
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+
+    throw new AppError(
+      "Incorrect email or password",
+      401
+    );
+
+  }
+
+  const isMatch = await bcrypt.compare(
+    password,
+    user.password
+  );
+
+  if (!isMatch) {
+
+    throw new AppError(
+      "Incorrect email or password",
+      401
+    );
+
+  }
+
+  return user;
+
+};
+
