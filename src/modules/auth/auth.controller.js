@@ -1,10 +1,13 @@
 import { loginService } from "../auth/auth.service.js";
+
 import generateToken from "../../utils/generateToken.js";
+
 import sendCookie from "../../utils/sendCookie.js";
 
 class AuthController {
 
   async login(req, res) {
+
     try {
 
       const { email, password } = req.body;
@@ -17,44 +20,43 @@ class AuthController {
 
       return res.status(200).json({
         success: true,
-        user
+        user,
       });
 
     } catch (error) {
 
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
 
     }
+
   }
 
-  // ✅ ADD THIS
-  async googleLogin(req, res) {
-    res.send("Google login route working");
-  }
-
-  // ✅ ADD THIS
+  // Google callback
   async googleCallback(req, res) {
+
     try {
 
-      // بعد ما ييجي من Google
       const user = req.user;
 
       const token = generateToken(user._id);
 
       sendCookie(res, token);
 
+      // redirect للفرونت
       res.redirect(process.env.CLIENT_URL);
 
     } catch (error) {
 
       res.status(500).json({
-        message: error.message
+        success: false,
+        message: error.message,
       });
 
     }
+
   }
 
 }
