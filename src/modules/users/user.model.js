@@ -7,12 +7,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true.valueOf,
-    validate: {
-      validator: function (v) {
-        return /^[a-zA-Z\s]+$/.test(v);
-      },
-      message: "Name must contain only letters and spaces"
-    }
+
   },
   image: {
     type: String,
@@ -81,7 +76,7 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password") || !this.password) {
-    return next();
+    return;
   } else {
     this.password = await bcrypt.hash(this.password, 8);
   }

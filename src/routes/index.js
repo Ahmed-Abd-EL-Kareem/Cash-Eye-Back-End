@@ -1,31 +1,16 @@
+// import usersRouter from "../modules/users/users.route.js"
+import authRouter from "../modules/auth/auth.routes.js"
+// import subscriptionRouter from "../modules/subscriptions/subscription.routes.js";
 import express from "express";
-import UserController from '../modules/users/user.controller.js'
-// import { forgotPassword, resetPassword } from "../modules/auth/auth.service.js";
-
-////////Hala/////////
-import AuthController
-from "../modules/auth/auth.controller.js";
-
 const router = express.Router();
-router.route("/users").get(UserController.getAllUsers).post(UserController.createUser)
-router.route("/users/:id").get(UserController.getUserById).patch(UserController.updateUserById).delete(UserController.deleteUserById)
+
+// ? User Router
+// router.use("/users", usersRouter)
+
 //! Auth routes
-// router.post("/forgot-password", forgotPassword);
-// router.post("/reset-password", resetPassword);
-//////////login route//////////
-router.post(
-  "/login",
-  AuthController.login.bind(AuthController)
-);
+router.use('/auth', authRouter)
 
-router.get(
-  "/google",
-  AuthController.googleLogin.bind(AuthController)
-);
-
-router.get(
-  "/google/callback",
-  AuthController.googleCallback.bind(AuthController)
-);
+//? Subscriptions 
+// router.use("/subscriptions", subscriptionRouter);
 
 export default router

@@ -1,62 +1,40 @@
-import { loginService } from "../auth/auth.service.js";
-import generateToken from "../../utils/generateToken.js";
-import sendCookie from "../../utils/sendCookie.js";
+import {
+  signup,
+  login,
+  forgotPassword,
+  resetPassword,
+  googleCallback,
+} from "./auth.service.js";
 
-class AuthController {
 
-  async login(req, res) {
-    try {
 
-      const { email, password } = req.body;
+const register = (req, res, next) => {
+  return signup(req, res, next);
+};
 
-      const user = await loginService(email, password);
+const loginUser = (req, res, next) => {
+  return login(req, res, next);
+};
 
-      const token = generateToken(user._id);
+const forgotPass = (req, res, next) => {
+  return forgotPassword(req, res, next);
+};
 
-      sendCookie(res, token);
+const resetPass = (req, res, next) => {
+  return resetPassword(req, res, next);
+};
 
-      return res.status(200).json({
-        success: true,
-        user
-      });
+const googleAuthCallback = (req, res, next) => {
+  console.log(process.env.CLIENT_URL);
 
-    } catch (error) {
+  return googleCallback(req, res, next);
+};
 
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
 
-    }
-  }
-
-  // ✅ ADD THIS
-  async googleLogin(req, res) {
-    res.send("Google login route working");
-  }
-
-  // ✅ ADD THIS
-  async googleCallback(req, res) {
-    try {
-
-      // بعد ما ييجي من Google
-      const user = req.user;
-
-      const token = generateToken(user._id);
-
-      sendCookie(res, token);
-
-      res.redirect(process.env.CLIENT_URL);
-
-    } catch (error) {
-
-      res.status(500).json({
-        message: error.message
-      });
-
-    }
-  }
-
-}
-
-export default new AuthController();
+export {
+  register,
+  loginUser,
+  forgotPass,
+  resetPass,
+  googleAuthCallback,
+};
