@@ -5,9 +5,9 @@ const router = express.Router();
 
 
 
-// router.post("/signup", AuthController.register);
-// router.post("/forgot-password", AuthController.forgotPass);
-// router.post("/reset-password", AuthController.resetPass);
+router.post("/signup", AuthController.register);
+router.post("/forgot-password", AuthController.forgotPass);
+router.post("/reset-password", AuthController.resetPass);
 router.post("/login", AuthController.loginUser);
 // Google Login
 router.get(
@@ -28,17 +28,6 @@ router.get(
 
   AuthController.googleAuthCallback
 );
-// router.get(
-//   '/google',
-//   passport.authenticate('google', {
-//     scope: ['profile', 'email']
-//   })
-// );
 
-// router.get(
-//   '/google/callback',
-//   passport.authenticate('google', { session: false }),
-//   AuthController.googleAuthCallback
-// );
 
 export default router
