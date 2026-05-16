@@ -228,6 +228,11 @@ const forgotPassword = catchAsync(async (req, res, next) => {
     OTP.toString(),
     10
   );
+  user.OTP = hashedOTP;
+  user.resetOTPExpiration = Date.now() + 15 * 60 * 1000;
+  await user.save();
+
+  const templatePath = path.join(process.cwd(), "views/emails/reset-password.ejs");
 
   user.otp = hashedOTP;
 
@@ -270,6 +275,12 @@ const forgotPassword = catchAsync(async (req, res, next) => {
     user.resetOTPExpiration =
       undefined;
 
+    await sendEmail({ email: user.email, subject: "reset password", message: html });
+    res.status(200).json({ message: "Reset code sent to your email" });
+  } catch (error) {
+    console.log(error)
+    user.OTP = undefined;
+    user.resetOTPExpiration = undefined;
     await user.save();
 
     return next(
@@ -281,6 +292,8 @@ const forgotPassword = catchAsync(async (req, res, next) => {
   }
 
 });
+export const resetPassword = catchAsync(async (req, res) => {
+  const { newPassword, email, otp } = req.body;
 
 // ================= RESET PASSWORD =================
 
@@ -326,6 +339,7 @@ const resetPassword = catchAsync(async (req, res, next) => {
     otp,
     user.otp
   );
+  const isValid = await bcrypt.compare(otp, user.OTP);
 
   if (!isValid) {
     return next(
@@ -373,3 +387,4 @@ export {
   resetPassword,
   googleCallback,
 };
+  

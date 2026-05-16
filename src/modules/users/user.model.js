@@ -8,6 +8,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true.valueOf,
 
+    validate: {
+      validator: function (v) {
+        return /^[a-zA-Z\s]+$/.test(v);
+      },
+      message: "Name must contain only letters and spaces"
+    }
   },
   image: {
     type: String,
@@ -64,21 +70,22 @@ const userSchema = new mongoose.Schema({
     default: "user",
   },
   subscription: {
-    type: String,
-    enum: ["free", "premium"],
-    default: "free",
-  }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Subscription",
+  },
+  otp: String,
+  resetOTPExpiration: Date
 },
   {
     timestamps: true,
   },
 );
 
-userSchema.pre("save", async function () {
+userSchema.pre("save", async function (_, next) {
   if (!this.isModified("password") || !this.password) {
     return;
   } else {
-    this.password = await bcrypt.hash(this.password, 8);
+    this.password = await bcrypt.hash(this.password, 12);
   }
 });
 const UserModel = mongoose.model("User", userSchema);
