@@ -1,7 +1,7 @@
 import "./src/config/env.js";
 import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
-import { seedPlans } from "./src/seed/plans.seed.js";
+import { seedPlans } from "./src/modules/plans/plan.service.js";
 
 
 const port = process.env.PORT || 3000;
