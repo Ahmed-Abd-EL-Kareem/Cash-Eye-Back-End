@@ -76,10 +76,12 @@ coverage/
 # Misc
 # =========================
 *.env.local
+*.env.example
 *.env.development.local
 *.env.test.local
 *.env.production.local
 *.development.env
 *.development.env
 *.md
+.env.example
 *.prettierrc
