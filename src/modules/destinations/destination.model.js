@@ -6,19 +6,37 @@ const attractionSchema = new mongoose.Schema(
       en: { type: String, required: true },
       ar: { type: String, required: true },
     },
-    type: { type: String }, 
-    entryFee: { type: Number, default: 0 },
+
+    type: {
+      type: String,
+      trim: true,
+    },
+
+    entryFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { _id: false }
 );
- 
+
 const destinationSchema = new mongoose.Schema(
   {
     name: {
-      en: { type: String, required: true, trim: true },
-      ar: { type: String, required: true, trim: true },
+      en: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      ar: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
- 
+
     slug: {
       type: String,
       required: true,
@@ -27,45 +45,75 @@ const destinationSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    
+
     city: {
       type: String,
       required: true,
       trim: true,
       index: true,
     },
-    
+
     description: {
-      en: { type: String, required: true },
-      ar: { type: String, required: true },
+      en: {
+        type: String,
+        required: true,
+      },
+
+      ar: {
+        type: String,
+        required: true,
+      },
     },
- 
+
     attractions: {
       type: [attractionSchema],
       default: [],
     },
-    
+
     bestMonths: {
       type: [String],
       default: [],
     },
- 
+
     averageBudgetPerDay: {
       type: Number,
       required: true,
       min: 0,
     },
-    currency: { 
-  type: String, 
-  enum: ["USD", "EGP"], 
-  default: "EGP" 
-},
 
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
+    currency: {
+      type: String,
+      enum: ["USD", "EGP"],
+      default: "EGP",
     },
- 
+
+   
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+
+      coordinates: {
+        type: [Number], 
+        required: true,
+
+        validate: {
+          validator: function (value) {
+            return (
+              Array.isArray(value) &&
+              value.length === 2 &&
+              value.every((num) => typeof num === "number")
+            );
+          },
+
+          message:
+            "location.coordinates must contain [lng, lat]",
+        },
+      },
+    },
+
     images: {
       type: [String],
       default: [],
@@ -76,16 +124,24 @@ const destinationSchema = new mongoose.Schema(
     versionKey: false,
   }
 );
- 
+
+
+destinationSchema.index({ location: "2dsphere" });
+
 destinationSchema.pre("save", function () {
   if (!this.slug && this.name?.en) {
-    this.slug = this.name.en.toLowerCase().replace(/\s+/g, "-");
+    this.slug = this.name.en
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-");
   }
-
 });
 
-const Destination = mongoose.model("Destination", destinationSchema);
- 
+const Destination = mongoose.model(
+  "Destination",
+  destinationSchema
+);
+
 export default Destination;
 
 
