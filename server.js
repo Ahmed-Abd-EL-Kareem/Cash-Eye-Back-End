@@ -1,8 +1,3 @@
-// import dns from node :dns;
-import dns from "dns";
-
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
 import "./src/config/env.js";
 import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
