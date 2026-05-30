@@ -1,11 +1,7 @@
-<<<<<<< HEAD
-import Destination from "./destination.model.js";
-=======
 // Repository: all DB access in one place.
 // Services call this — they never import the model directly.
 
 import DestinationModel from "./destination.model.js";
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 
 export const findAll = async ({
   filter = {},
@@ -13,15 +9,7 @@ export const findAll = async ({
   limit = 10,
   sort = { createdAt: -1 },
 }) => {
-<<<<<<< HEAD
-  return Destination.find(filter)
-    .sort(sort)
-    .skip(skip)
-    .limit(limit)
-    .lean();
-=======
   return DestinationModel.find(filter).sort(sort).skip(skip).limit(limit).lean();
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 };
 
 export const countAll = async (filter = {}) => {
@@ -36,8 +24,6 @@ export const findBySlug = async (slug) => {
   return DestinationModel.findOne({ slug }).lean();
 };
 
-<<<<<<< HEAD
-=======
 // ─── Geo: find destinations near a point ─────────────────────────────────────
 // $near requires the 2dsphere index on location.
 // Returns documents sorted by distance (closest first) automatically.
@@ -56,49 +42,17 @@ export const findNear = async ({ coordinates, maxMeters = 100000, limit = 10 }) 
     .lean();
 };
 
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 export const create = async (data) => {
   return DestinationModel.create(data);
 };
 
 export const updateById = async (id, data) => {
-<<<<<<< HEAD
-  return Destination.findByIdAndUpdate(id, data, {
-=======
   return DestinationModel.findByIdAndUpdate(id, data, {
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
     new: true,
     runValidators: true,
   }).lean();
 };
 
-<<<<<<< HEAD
-export const deleteById = async (id) => {
-  return Destination.findByIdAndDelete(id).lean();
-};
-
-// NEW → FIND NEARBY DESTINATIONS
-export const findNearby = async ({
-  lng,
-  lat,
-  radius = 50000,
-  limit = 10,
-}) => {
-  return Destination.find({
-    location: {
-      $near: {
-        $geometry: {
-          type: "Point",
-          coordinates: [lng, lat],
-        },
-
-        $maxDistance: radius,
-      },
-    },
-  })
-    .limit(limit)
-    .lean();
-=======
 // Soft delete — isActive:false, document stays in DB and Pinecone
 export const softDeleteById = async (id) => {
   return DestinationModel.findByIdAndUpdate(
@@ -106,5 +60,4 @@ export const softDeleteById = async (id) => {
     { isActive: false },
     { new: true }
   ).lean();
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 };

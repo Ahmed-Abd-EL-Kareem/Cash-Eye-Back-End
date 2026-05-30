@@ -7,19 +7,6 @@ const attractionSchema = new mongoose.Schema(
       en: { type: String, required: true, trim: true },
       ar: { type: String, default: null, trim: true },
     },
-<<<<<<< HEAD
-
-    type: {
-      type: String,
-      trim: true,
-    },
-
-    entryFee: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-=======
     type: {
       type: String,
       enum: [
@@ -29,15 +16,11 @@ const attractionSchema = new mongoose.Schema(
       default: "historical",
     },
     entryFee: { type: Number, default: 0, min: 0 },
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
   },
   { _id: false }
 );
 
-<<<<<<< HEAD
-=======
 // ─── Main schema ──────────────────────────────────────────────────────────────
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 const destinationSchema = new mongoose.Schema(
   {
     // ── Bilingual content (i18n — EN + AR) ──────────────────────────────────
@@ -55,10 +38,7 @@ const destinationSchema = new mongoose.Schema(
       },
     },
 
-<<<<<<< HEAD
-=======
     // ── URL-safe slug — auto-generated from name.en ──────────────────────────
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
     slug: {
       type: String,
       required: true,
@@ -73,8 +53,6 @@ const destinationSchema = new mongoose.Schema(
       trim: true,
     },
 
-<<<<<<< HEAD
-=======
     region: {
       type: String,
       enum: [
@@ -93,7 +71,6 @@ const destinationSchema = new mongoose.Schema(
       default: "historical",
     },
 
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
     description: {
       en: {
         type: String,
@@ -105,61 +82,6 @@ const destinationSchema = new mongoose.Schema(
         required: true,
       },
     },
-<<<<<<< HEAD
-
-    attractions: {
-      type: [attractionSchema],
-      default: [],
-    },
-
-    bestMonths: {
-      type: [String],
-      default: [],
-    },
-
-    averageBudgetPerDay: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    currency: {
-      type: String,
-      enum: ["USD", "EGP"],
-      default: "EGP",
-    },
-
-   
-    location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: "Point",
-      },
-
-      coordinates: {
-        type: [Number], 
-        required: true,
-
-        validate: {
-          validator: function (value) {
-            return (
-              Array.isArray(value) &&
-              value.length === 2 &&
-              value.every((num) => typeof num === "number")
-            );
-          },
-
-          message:
-            "location.coordinates must contain [lng, lat]",
-        },
-      },
-    },
-
-    images: {
-      type: [String],
-      default: [],
-=======
 
     attractions: { type: [attractionSchema], default: [] },
 
@@ -188,7 +110,6 @@ const destinationSchema = new mongoose.Schema(
         type: [Number],   // [longitude, latitude] — GeoJSON order (lng first)
         default: [0, 0],
       },
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
     },
 
     // ── Images from gldv2_info.csv (Wikipedia Commons URLs) ─────────────────
@@ -207,36 +128,18 @@ const destinationSchema = new mongoose.Schema(
   }
 );
 
-<<<<<<< HEAD
-
-destinationSchema.index({ location: "2dsphere" });
-
-=======
 // ─── Pre-save: auto-generate slug ────────────────────────────────────────────
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 destinationSchema.pre("save", function () {
   if (!this.slug && this.name?.en) {
     this.slug = this.name.en
       .toLowerCase()
       .trim()
-<<<<<<< HEAD
-=======
       .replace(/[^a-z0-9\s-]/g, "")
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
       .replace(/\s+/g, "-");
   }
 });
 
-<<<<<<< HEAD
-const Destination = mongoose.model(
-  "Destination",
-  destinationSchema
-);
-
-export default Destination;
-=======
 // ─── Indexes ──────────────────────────────────────────────────────────────────
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 
 // 2dsphere — required for all GeoJSON geo queries ($near, $geoWithin etc.)
 // Must be declared on the GeoJSON field, not on lat/lng floats.

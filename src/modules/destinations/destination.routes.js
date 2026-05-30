@@ -15,51 +15,6 @@ import { seedDestinations } from "../../seed/destinations.seed.js";
 
 const router = Router();
 
-<<<<<<< HEAD
-
-
-router.get(
-  "/",
-  destinationController.getDestinations
-);
-
-
-router.get(
-  "/nearby",
-  destinationController.getNearbyDestinations
-);
-
-router.get(
-  "/:id",
-  validateObjectId,
-  destinationController.getDestination
-);
-
-
-router.use(
-  protect,
-  restrictTo("admin")
-);
-
-router.post(
-  "/",
-  validateCreateDestination,
-  destinationController.createDestination
-);
-
-router.patch(
-  "/:id",
-  validateObjectId,
-  validateUpdateDestination,
-  destinationController.updateDestination
-);
-
-router.delete(
-  "/:id",
-  validateObjectId,
-  destinationController.deleteDestination
-);
-=======
 // ─── Public routes ────────────────────────────────────────────────────────────
 
 // IMPORTANT: specific string routes (/nearby, /slug/:slug) must come BEFORE
@@ -76,6 +31,5 @@ router.use(protect, restrictTo("admin"));
 router.post("/", validateCreateDestination, destinationController.createDestination);
 router.patch("/:id", validateObjectId, validateUpdateDestination, destinationController.updateDestination);
 router.delete("/:id", validateObjectId, destinationController.deleteDestination);
->>>>>>> 4d5aa4b661dd0b7d917db77cc10fe1ed9c4b125e
 
 export default router;
