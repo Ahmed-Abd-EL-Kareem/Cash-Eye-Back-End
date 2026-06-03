@@ -1,33 +1,67 @@
 import mongoose from "mongoose";
-import { TRIP_STATUSES, CURRENCIES } from "../../utils/constants.js";
 
-const itineraryDaySchema = new mongoose.Schema(
+// ─── Day sub-schema ───────────────────────────────────────────────────────────
+// Embedded because days are always read together with the trip
+// and never queried independently.
+const daySchema = new mongoose.Schema(
   {
-    day: Number,
-    title: String,
-    activities: [String],
-    estimatedCost: Number,
+    day: { type: Number, required: true },
+    title: { type: String, default: null },
+    activities: { type: [String], default: [] },
+    meals: { type: [String], default: [] },
+    accommodation: { type: String, default: null },
+    tips: { type: String, default: null },
+    estimatedCost: { type: Number, default: 0 },
   },
   { _id: false }
 );
 
+// ─── Trip schema ──────────────────────────────────────────────────────────────
 const tripSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    destination: { type: String, required: true },
-    budget: { type: Number, required: true },
-    currency: { type: String, enum: CURRENCIES, default: "EGP" },
-    days: { type: Number, required: true, min: 1 },
-    travelers: { type: Number, required: true, min: 1 },
-    hotelId: { type: mongoose.Schema.Types.ObjectId, ref: "Hotel" },
-    itinerary: [itineraryDaySchema],
-    aiTips: [{ type: String }],
-    totalEstimatedCost: { type: Number, default: 0 },
-    status: { type: String, enum: TRIP_STATUSES, default: "draft" },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    // AI-generated or manually saved
+    title: { type: String, required: true, trim: true },
+    destination: { type: String, required: true, trim: true },
+    duration: { type: Number, required: true, min: 1 },
+
+    budget: {
+      type: String,
+      enum: ["budget", "mid-range", "luxury"],
+      default: "mid-range",
+    },
+
+    travelers: { type: Number, default: 1, min: 1 },
+    interests: { type: [String], default: [] },
+
+    // Itinerary from AI
+    days: { type: [daySchema], default: [] },
+    summary: { type: String, default: null },
+
+    estimatedTotalCost: { type: Number, default: 0 },
+    currency: { type: String, enum: ["EGP", "USD"], default: "EGP" },
+
+    // Language the trip was generated in
     language: { type: String, enum: ["en", "ar"], default: "en" },
+
+    status: {
+      type: String,
+      enum: ["draft", "saved", "archived"],
+      default: "draft",
+    },
+
+    isAIGenerated: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
+
+tripSchema.index({ user: 1, createdAt: -1 });
+tripSchema.index({ destination: 1, status: 1 });
 
 const TripModel = mongoose.model("Trip", tripSchema);
 export default TripModel;

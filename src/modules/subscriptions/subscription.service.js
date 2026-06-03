@@ -1,12 +1,14 @@
 import SubscriptionModel from "./subscription.model.js";
 import PlanModel from "../plans/plan.model.js";
 import UserModel from "../users/user.model.js";
-import ApiError from "../../utils/apiError.js";
+import AppError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
+
+// ─── Create Free Subscription ──────────────────────────────────────────────────
 
 export const createFreeSubscription = async (userId) => {
   const freePlan = await PlanModel.findOne({ name: "free" });
-  if (!freePlan) throw new ApiError("Free plan not found", 500);
+  if (!freePlan) throw new AppError("Free plan not found", 500);
 
   const existing = await SubscriptionModel.findOne({ user: userId });
   if (existing) return existing;
@@ -19,14 +21,18 @@ export const createFreeSubscription = async (userId) => {
   });
 };
 
+// ─── Get My Subscription ───────────────────────────────────────────────────────
+
 export const getMySubscription = async (userId) => {
   const sub = await SubscriptionModel.findOne({ user: userId }).populate(
     "plan",
     "name displayName price limits features"
   );
-  if (!sub) throw new ApiError("Subscription not found", 404);
+  if (!sub) throw new AppError("Subscription not found", 404);
   return sub;
 };
+
+// ─── Change Plan (user self-service) ──────────────────────────────────────────
 
 export const changePlan = async (userId, newPlanName) => {
   const [plan, subscription] = await Promise.all([
@@ -34,11 +40,10 @@ export const changePlan = async (userId, newPlanName) => {
     SubscriptionModel.findOne({ user: userId }),
   ]);
 
-  if (!plan) throw new ApiError("Plan not found or inactive", 404);
-  if (!subscription) throw new ApiError("Subscription not found", 404);
-  if (subscription.planName === newPlanName) {
-    throw new ApiError("Already on this plan", 400);
-  }
+  if (!plan) throw new AppError("Plan not found or inactive", 404);
+  if (!subscription) throw new AppError("Subscription not found", 404);
+  if (subscription.planName === newPlanName)
+    throw new AppError("Already on this plan", 400);
 
   subscription.history.push({
     fromPlan: subscription.planName,
@@ -56,12 +61,14 @@ export const changePlan = async (userId, newPlanName) => {
   return subscription;
 };
 
+// ─── Check & Consume Tokens ────────────────────────────────────────────────────
+
 export const checkAndConsumeTokens = async (userId, tokensToUse) => {
   const subscription = await SubscriptionModel.findOne({ user: userId }).populate(
     "plan",
     "limits"
   );
-  if (!subscription) throw new ApiError("Subscription not found", 404);
+  if (!subscription) throw new AppError("Subscription not found", 404);
 
   subscription.checkAndResetMonthly();
   subscription.checkAndResetDaily();
@@ -69,14 +76,14 @@ export const checkAndConsumeTokens = async (userId, tokensToUse) => {
   const { tokensPerMonth, requestsPerDay } = subscription.plan.limits;
 
   if (subscription.usage.requestsToday >= requestsPerDay) {
-    throw new ApiError(
+    throw new AppError(
       `Daily request limit reached (${requestsPerDay}/day). Upgrade to Pro for more.`,
       429
     );
   }
 
   if (subscription.usage.tokensUsedThisMonth + tokensToUse > tokensPerMonth) {
-    throw new ApiError(
+    throw new AppError(
       `Monthly token limit reached (${tokensPerMonth.toLocaleString()} tokens). Upgrade to Pro for more.`,
       429
     );
@@ -93,6 +100,10 @@ export const checkAndConsumeTokens = async (userId, tokensToUse) => {
   };
 };
 
+// ─── Admin: Get All Subscriptions (with APIFeatures) ──────────────────────────
+// Supports: ?status=active  ?planName=pro  ?search=ahmed
+//           ?sort=-createdAt  ?page=1  ?limit=10
+
 export const getAllSubscriptions = async (query = {}) => {
   const baseQuery = SubscriptionModel.find()
     .populate("user", "name email")
@@ -100,7 +111,7 @@ export const getAllSubscriptions = async (query = {}) => {
 
   const features = new APIFeatures(SubscriptionModel, baseQuery, query)
     .filter()
-    .search([])
+    .search([])   // subscriptions have no text fields worth searching — extend if needed
     .sort()
     .paginate();
 
@@ -121,14 +132,16 @@ export const getAllSubscriptions = async (query = {}) => {
   };
 };
 
+// ─── Admin: Change Any User's Plan ────────────────────────────────────────────
+
 export const adminChangePlan = async (userId, newPlanName) => {
   const [plan, subscription] = await Promise.all([
     PlanModel.findOne({ name: newPlanName }),
     SubscriptionModel.findOne({ user: userId }),
   ]);
 
-  if (!plan) throw new ApiError("Plan not found", 404);
-  if (!subscription) throw new ApiError("Subscription not found", 404);
+  if (!plan) throw new AppError("Plan not found", 404);
+  if (!subscription) throw new AppError("Subscription not found", 404);
 
   subscription.history.push({
     fromPlan: subscription.planName,

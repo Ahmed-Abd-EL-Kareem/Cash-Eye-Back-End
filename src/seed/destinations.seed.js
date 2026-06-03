@@ -4,6 +4,7 @@
 
 import DestinationModel from "../modules/destinations/destination.model.js";
 import logger from "../config/logger.js";
+import { upsertDocuments, buildIndexText } from "../ai/pinecone.rag.js";
 
 export const DESTINATIONS_DATA = [
   // ─── Cairo ───────────────────────────────────────────────────────────────
@@ -522,6 +523,28 @@ export const seedDestinations = async () => {
   console.log
     (`✅ Destinations seeded: ${inserted.length} records across ${[...new Set(inserted.map((d) => d.city))].length
       } cities`);
+
+  // Index destinations in Pinecone for RAG
+  try {
+    const docsToIndex = inserted.map((doc, index) => ({
+      id: `dest_${doc._id}`,
+      text: buildIndexText("destination", doc),
+      metadata: {
+        _id: doc._id.toString(),
+        name: doc.name,
+        city: doc.city,
+        region: doc.region,
+        category: doc.category,
+        slug: doc.slug
+      }
+    }));
+
+    await upsertDocuments(docsToIndex);
+    console.log(`[Seed] Indexed ${docsToIndex.length} destinations in Pinecone`);
+  } catch (error) {
+    console.warn(`[Seed] Failed to index destinations in Pinecone: ${error.message}`);
+    // Continue anyway - seeding is successful even if Pinecone fails
+  }
 
   return inserted;
 }

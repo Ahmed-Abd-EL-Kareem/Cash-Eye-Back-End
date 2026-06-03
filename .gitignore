@@ -81,7 +81,8 @@ coverage/
 *.env.test.local
 *.env.production.local
 *.development.env
-*.development.env
 *.md
 .env.example
 *.prettierrc
+*.kilo
+*.opencode

@@ -33,7 +33,7 @@ const planSchema = new mongoose.Schema(
       maxFileSizeMB: { type: Number, default: 0 },
       allowedModels: {
         type: [String],
-        default: ["gpt-3.5-turbo"],
+        default: ["gpt-4o-mini"],
       },
     },
     features: {

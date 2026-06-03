@@ -10,7 +10,7 @@ import { seedHotels } from "../../seed/hotels.seed.js";
 
 const router = Router();
 
-// router.get("/seed", seedHotels)
+router.get("/seed", seedHotels)
 // Public
 router.get("/", hotelController.getHotels);
 

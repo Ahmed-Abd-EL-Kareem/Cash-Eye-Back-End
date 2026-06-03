@@ -21,7 +21,7 @@ if (process.env.NODE_ENV === "development") {
   console.log("NODE_ENV:", process.env.NODE_ENV);
 }
 
-app.use(requestLogger);
+// app.use(requestLogger);
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -66,6 +66,11 @@ app.use(passport.session());
 
 app.use("/api", globalLimiter);
 app.use("/api/v1", apiRoutes);
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+});
 
 app.use(/.*/, (req, res, next) => {
   next(new ApiError(`Can't find ${req.originalUrl} on this server`, 404));

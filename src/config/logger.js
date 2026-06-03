@@ -9,4 +9,11 @@ export const requestLogger = (req, res, next) => {
   return next();
 };
 
-export default requestLogger;
+// Simple logger for consistent logging across the application
+const logger = {
+  info: (message) => console.log(`[INFO] ${message}`),
+  warn: (message) => console.warn(`[WARN] ${message}`),
+  error: (message) => console.error(`[ERROR] ${message}`),
+};
+
+export default logger;

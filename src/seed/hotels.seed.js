@@ -1,6 +1,7 @@
 // hotels.seed.js
 
 import HotelModel from "../modules/hotels/hotel.model.js";
+import { upsertDocuments, buildIndexText } from "../ai/pinecone.rag.js";
 
 export const HOTELS_DATA = [
 
@@ -611,16 +612,38 @@ export const seedHotels = async () => {
   const count = await HotelModel.countDocuments();
   if (count > 0) {
     console.log
-      (`[Seed] Destinations already seeded (${count} records) — skipping`);
+      (`[Seed] Hotels already seeded (${count} records) — skipping`);
     return;
   }
 
   console.log
-    ("[Seed] Seeding destinations...");
+    ("[Seed] Seeding hotels...");
   const inserted = await HotelModel.insertMany(HOTELS_DATA);
   console.log
-    (`✅ Destinations seeded: ${inserted.length} records across ${[...new Set(inserted.map((d) => d.city))].length
+    (`✅ Hotels seeded: ${inserted.length} records across ${[...new Set(inserted.map((d) => d.city))].length
       } cities`);
+
+  // Index hotels in Pinecone for RAG
+  try {
+    const docsToIndex = inserted.map((doc, index) => ({
+      id: `hotel_${doc._id}`,
+      text: buildIndexText("hotel", doc),
+      metadata: {
+        _id: doc._id.toString(),
+        name: doc.name,
+        city: doc.city,
+        stars: doc.stars,
+        averagePricePerNight: doc.averagePricePerNight,
+        currency: doc.currency
+      }
+    }));
+
+    await upsertDocuments(docsToIndex);
+    console.log(`[Seed] Indexed ${docsToIndex.length} hotels in Pinecone`);
+  } catch (error) {
+    console.warn(`[Seed] Failed to index hotels in Pinecone: ${error.message}`);
+    // Continue anyway - seeding is successful even if Pinecone fails
+  }
 
   return inserted;
 }

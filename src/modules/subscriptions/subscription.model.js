@@ -30,6 +30,7 @@ const subscriptionSchema = new mongoose.Schema(
     usage: {
       tokensUsedThisMonth: { type: Number, default: 0 },
       requestsToday: { type: Number, default: 0 },
+      tripsThisMonth: { type: Number, default: 0 }, // ← trip generation quota
       lastRequestDate: { type: Date, default: null },
       lastResetDate: { type: Date, default: Date.now },
     },
@@ -46,26 +47,44 @@ const subscriptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// ─── Reset daily request counter ─────────────────────────────────────────────
 subscriptionSchema.methods.checkAndResetDaily = function () {
   const today = new Date().toDateString();
   const lastRequest = this.usage.lastRequestDate
     ? this.usage.lastRequestDate.toDateString()
     : null;
+
   if (lastRequest !== today) {
     this.usage.requestsToday = 0;
     this.usage.lastRequestDate = new Date();
   }
 };
 
+// ─── Reset monthly token + trip counters ─────────────────────────────────────
 subscriptionSchema.methods.checkAndResetMonthly = function () {
   const now = new Date();
   const lastReset = this.usage.lastResetDate;
   const monthDiff =
     (now.getFullYear() - lastReset.getFullYear()) * 12 +
     (now.getMonth() - lastReset.getMonth());
+
   if (monthDiff >= 1) {
     this.usage.tokensUsedThisMonth = 0;
     this.usage.lastResetDate = now;
+  }
+};
+
+// ─── Reset monthly trip counter ───────────────────────────────────────────────
+// Separate from checkAndResetMonthly so the middleware can call it independently
+subscriptionSchema.methods.checkAndResetTrips = function () {
+  const now = new Date();
+  const lastReset = this.usage.lastResetDate;
+  const monthDiff =
+    (now.getFullYear() - lastReset.getFullYear()) * 12 +
+    (now.getMonth() - lastReset.getMonth());
+
+  if (monthDiff >= 1) {
+    this.usage.tripsThisMonth = 0;
   }
 };
 
