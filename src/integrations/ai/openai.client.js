@@ -29,4 +29,3 @@ if (!process.env.NVIDIA_API_KEY) {
 if (!process.env.OPENAI_API_KEY) {
   logger.warn("[OpenAI] OPENAI_API_KEY is not set for embeddings");
 }
-
