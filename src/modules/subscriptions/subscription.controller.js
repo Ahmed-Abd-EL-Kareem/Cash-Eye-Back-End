@@ -1,7 +1,7 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/apiError.js";
 import * as subscriptionService from "./subscription.service.js";
-import PlanModel from "../plans/plan.model.js";
+import PlanModel from "./plan/plan.model.js";
 
 export const getPlans = asyncHandler(async (req, res) => {
   const plans = await PlanModel.find({ isActive: true }).sort("sortOrder");

@@ -5,8 +5,8 @@
 import { chatClient } from "./openai.client.js";
 import { retrieveContext } from "./pinecone.rag.js";
 import { buildChatSystemPrompt, buildRagQuery } from "./prompt.engine.js";
-import ApiError from "../utils/apiError.js";
-import logger from "../config/logger.js";
+import ApiError from "../../utils/apiError.js";
+import logger from "../../config/logger.js";
 
 // Max conversation turns to send — keeps tokens under control
 const MAX_HISTORY_TURNS = 10;

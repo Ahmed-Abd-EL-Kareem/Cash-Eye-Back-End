@@ -7,6 +7,7 @@ import hotelRouter from "../modules/hotels/hotel.routes.js";
 import bookingRouter from "../modules/bookings/booking.routes.js";
 import tripRouter from "../modules/trips/trip.routes.js";
 import aiRouter from "../modules/ai/ai.routes.js";
+import bookingPaymentRoutes from "../modules/payments/booking/bookingPayment.routes.js";
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use("/hotels", hotelRouter);
 router.use("/bookings", bookingRouter);
 router.use("/trips", tripRouter);
 router.use("/ai", aiRouter);
+router.use("/payments", bookingPaymentRoutes);
 
 export default router;

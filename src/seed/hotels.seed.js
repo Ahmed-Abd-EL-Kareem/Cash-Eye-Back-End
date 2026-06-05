@@ -1,7 +1,7 @@
 // hotels.seed.js
 
 import HotelModel from "../modules/hotels/hotel.model.js";
-import { upsertDocuments, buildIndexText } from "../ai/pinecone.rag.js";
+import { upsertDocuments, buildIndexText } from "../integrations/ai/pinecone.rag.js";
 
 export const HOTELS_DATA = [
 

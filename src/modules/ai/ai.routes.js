@@ -7,8 +7,9 @@ const router = Router();
 
 router.use(protect);
 
-// POST /api/v1/ai/chat
-// checkAIQuota(false) — deducts from requestsToday only (not tripsThisMonth)
 router.post("/chat", checkAIQuota(false), aiController.chat);
+router.post("/hotels/search", checkAIQuota(false), aiController.searchHotels);
+router.post("/bookings/conversation", checkAIQuota(false), aiController.bookingConversation);
+router.get("/hotels/recommendations", checkAIQuota(false), aiController.getRecommendations);
 
 export default router;

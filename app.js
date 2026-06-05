@@ -8,27 +8,35 @@ import xss from "express-xss-sanitizer";
 import session from "express-session";
 
 import corsOptions from "./src/config/cors.js";
-import requestLogger from "./src/config/logger.js";
+import { requestLogger } from "./src/config/logger.js";
 import passport from "./src/config/passport.js";
 import { globalLimiter } from "./src/middleware/rateLimit.middleware.js";
 import { globalErrorHandler } from "./src/middleware/error.middleware.js";
 import ApiError from "./src/utils/apiError.js";
 import apiRoutes from "./src/routes/index.js";
-
 const app = express();
 
 if (process.env.NODE_ENV === "development") {
   console.log("NODE_ENV:", process.env.NODE_ENV);
 }
 
-// app.use(requestLogger);
+app.use(requestLogger);
 app.use(cors(corsOptions));
-app.use(express.json());
+
+// Preserve raw body for Stripe webhook signature verification
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      if (req.originalUrl?.includes("/webhook")) {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(helmet());
 app.use(compression());
-
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (!obj || typeof obj !== "object") return;
@@ -47,6 +55,7 @@ app.use((req, res, next) => {
 
   sanitize(req.body);
   sanitize(req.params);
+  sanitize(req.query);
   next();
 });
 
@@ -67,7 +76,6 @@ app.use(passport.session());
 app.use("/api", globalLimiter);
 app.use("/api/v1", apiRoutes);
 
-// Health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });

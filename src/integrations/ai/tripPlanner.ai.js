@@ -5,8 +5,8 @@
 import { chatClient } from "./openai.client.js";
 import { retrieveContext, buildIndexText } from "./pinecone.rag.js";
 import { buildTripPlannerPrompt, buildRagQuery } from "./prompt.engine.js";
-import ApiError from "../utils/apiError.js";
-import logger from "../config/logger.js";
+import ApiError from "../../utils/apiError.js";
+import logger from "../../config/logger.js";
 
 export const generateTripPlan = async ({
   destination,

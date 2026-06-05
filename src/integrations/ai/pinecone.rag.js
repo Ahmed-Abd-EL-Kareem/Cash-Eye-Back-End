@@ -8,16 +8,16 @@
 //   - retrieveContext() returns null so prompts work without RAG context
 
 // import openai from "./openai.client.js";
-import { getPinecone, PINECONE_INDEX } from "../config/pinecone.js";
-// import logger from "../config/logger.js";
+import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
+// import logger from "../../config/logger.js";
 
 // const EMBED_MODEL = "text-embedding-3-small"; // 1536 dimensions, fast + cheap
 const MIN_SCORE = 0.45;                     // relevance threshold — lower = more noise
 
 // ─── Embed a text string ──────────────────────────────────────────────────────
 import { embeddingClient } from "./openai.client.js";
-// import { getPinecone, PINECONE_INDEX } from "../config/pinecone.js";
-import logger from "../config/logger.js";
+// import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
+import logger from "../../config/logger.js";
 
 const EMBED_MODEL = "text-embedding-3-small";
 

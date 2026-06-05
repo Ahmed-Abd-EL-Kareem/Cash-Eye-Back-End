@@ -20,6 +20,18 @@ const bookingSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    // Payment fields
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "processing", "succeeded", "failed", "refunded"],
+      default: "pending",
+    },
+    paymentIntentId: { type: String },
+    paymentMethod: { type: String },
+    amountPaid: { type: Number, default: 0 },
+    paidAt: { type: Date },
+    failureReason: { type: String },
+
     specialRequests: { type: String, default: null },
     canceledAt: { type: Date, default: null },
     cancelReason: { type: String, default: null },
@@ -29,6 +41,7 @@ const bookingSchema = new mongoose.Schema(
 
 bookingSchema.index({ user: 1, status: 1 });
 bookingSchema.index({ hotel: 1, checkIn: 1, checkOut: 1 });
+bookingSchema.index({ paymentStatus: 1 });
 
 const BookingModel = mongoose.model("Booking", bookingSchema);
 export default BookingModel;

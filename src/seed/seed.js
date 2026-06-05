@@ -3,7 +3,7 @@
 
 import "../config/env.js";
 import mongoose from "mongoose";
-import { seedPlans } from "../modules/plans/plan.service.js";
+import { seedPlans } from "../modules/subscriptions/plan/plan.service.js";
 import { seedDestinations } from "./destinations.seed.js";
 import { seedHotels } from "./hotels.seed.js";
 import logger from "../config/logger.js";

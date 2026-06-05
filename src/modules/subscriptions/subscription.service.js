@@ -1,5 +1,5 @@
 import SubscriptionModel from "./subscription.model.js";
-import PlanModel from "../plans/plan.model.js";
+import PlanModel from "./plan/plan.model.js";
 import UserModel from "../users/user.model.js";
 import AppError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";

@@ -4,7 +4,7 @@
 
 import DestinationModel from "../modules/destinations/destination.model.js";
 import logger from "../config/logger.js";
-import { upsertDocuments, buildIndexText } from "../ai/pinecone.rag.js";
+import { upsertDocuments, buildIndexText } from "../integrations/ai/pinecone.rag.js";
 
 export const DESTINATIONS_DATA = [
   // ─── Cairo ───────────────────────────────────────────────────────────────

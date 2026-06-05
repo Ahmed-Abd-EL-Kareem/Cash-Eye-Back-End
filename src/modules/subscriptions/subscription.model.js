@@ -20,12 +20,16 @@ const subscriptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "canceled", "free"],
+      enum: ["active", "canceled", "free", "past_due"],
       default: "free",
     },
     startDate: { type: Date, default: Date.now },
     endDate: { type: Date, default: null },
     canceledAt: { type: Date, default: null },
+
+    // Stripe fields
+    stripeCustomerId: { type: String, unique: true, sparse: true },
+    stripeSubscriptionId: { type: String, unique: true, sparse: true },
 
     usage: {
       tokensUsedThisMonth: { type: Number, default: 0 },

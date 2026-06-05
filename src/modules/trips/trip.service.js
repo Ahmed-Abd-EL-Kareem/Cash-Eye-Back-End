@@ -2,7 +2,7 @@ import TripModel from "./trip.model.js";
 import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
-import { generateTripPlan } from "../../ai/tripPlanner.ai.js";
+import { generateTripPlan } from "../../integrations/ai/tripPlanner.ai.js";
 
 // ─── Generate + save AI trip ──────────────────────────────────────────────────
 export const generateAndSaveTrip = async (userId, params) => {

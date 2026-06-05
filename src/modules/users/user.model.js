@@ -8,10 +8,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
       trim: true,
-      validate: {
-        validator: (v) => /^[a-zA-Z\s]+$/.test(v),
-        message: "Name must contain only letters and spaces",
-      },
+      // validate: {
+      //   validator: (v) => /^[a-zA-Z\s]+$/.test(v),
+      //   message: "Name must contain only letters and spaces",
+      // },
     },
     image: {
       type: String,
