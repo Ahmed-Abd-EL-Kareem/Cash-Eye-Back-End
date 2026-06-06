@@ -2,6 +2,7 @@ import asyncHandler from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/apiError.js";
 import * as tripService from "./trip.service.js";
 import { successResponse, createdResponse } from "../../utils/apiResponse.js";
+import { recordAIUsage } from "../../middleware/aiUsage.middleware.js";
 
 // POST /api/v1/trips/generate
 export const generateTrip = asyncHandler(async (req, res) => {
@@ -20,6 +21,7 @@ export const generateTrip = asyncHandler(async (req, res) => {
     interests,
     language,
   });
+  await recordAIUsage(req.subscription, { isTripGeneration: true });
 
   createdResponse(res, {
     message: "Trip generated successfully",

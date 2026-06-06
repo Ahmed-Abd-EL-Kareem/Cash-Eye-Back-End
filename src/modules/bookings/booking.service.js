@@ -10,6 +10,9 @@ export const createBooking = async (userId, data) => {
 
   const checkIn = new Date(data.checkIn);
   const checkOut = new Date(data.checkOut);
+
+  if (checkIn < new Date()) throw new ApiError("checkIn must be a future date", 400);
+
   const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
   if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);

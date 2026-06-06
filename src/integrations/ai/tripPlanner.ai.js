@@ -3,6 +3,7 @@
 // Returns a parsed trip object + token usage for quota tracking.
 
 import { chatClient } from "./openai.client.js";
+// import openai from "./openai.client.js";
 import { retrieveContext, buildIndexText } from "./pinecone.rag.js";
 import { buildTripPlannerPrompt, buildRagQuery } from "./prompt.engine.js";
 import ApiError from "../../utils/apiError.js";
@@ -39,14 +40,16 @@ export const generateTripPlan = async ({
 
   // ── Step 3: call OpenAI ──────────────────────────────────────────────────
   const response = await chatClient.chat.completions.create({
-    // model: "gpt-4o-mini",
-    model: "nvidia/nemotron-3-super-120b-a12b",
+  // const response = await openai.chat.completions.create({
+  //   model: "gpt-4o-mini",
+    // model: "nvidia/nemotron-3-super-120b-a12b",
+    model: "openai/gpt-oss-120b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: 3000,
     response_format: { type: "json_object" }, // guarantees valid JSON output
   });
-
+  // console.log("response", response);
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new ApiError("AI failed to generate a trip plan — empty response", 500);
 
@@ -55,10 +58,20 @@ export const generateTripPlan = async ({
   try {
     parsed = JSON.parse(raw);
   } catch {
-    logger.error(`[TripPlanner] JSON parse failed: ${raw.slice(0, 300)}`);
-    throw new ApiError("AI returned malformed trip data. Please try again.", 500);
+    const match =
+      raw.match(/```json\s*([\s\S]*?)\s*```/) || raw.match(/(\{[\s\S]*\})/);
+    if (match) {
+      try {
+        parsed = JSON.parse(match[1]);
+      } catch {
+        parsed = null;
+      }
+    }
+    if (!parsed) {
+      logger.error(`[TripPlanner] JSON parse failed: ${raw.slice(0, 300)}`);
+      throw new ApiError("AI returned malformed trip data. Please try again.", 500);
+    }
   }
-
   // Basic shape validation — days array is the minimum required
   if (!Array.isArray(parsed.days) || parsed.days.length === 0) {
     throw new ApiError("AI trip plan is missing itinerary days. Please try again.", 500);

@@ -3,6 +3,85 @@ import SubscriptionModel from "../../subscriptions/subscription.model.js";
 import UserModel from "../../users/user.model.js";
 import PlanModel from "../../subscriptions/plan/plan.model.js";
 import ApiError from "../../../utils/apiError.js";
+import logger from "../../../config/logger.js";
+
+const getStripeSubscriptionId = (session) => {
+  const sub = session.subscription;
+  if (!sub) return null;
+  return typeof sub === "string" ? sub : sub.id;
+};
+
+const formatTripsLimit = (tripsPerMonth) =>
+  tripsPerMonth == null
+    ? "Unlimited AI trip plans per month"
+    : `${tripsPerMonth} AI trip plans per month`;
+
+const buildPlanCheckoutDescription = (plan) => {
+  const { tokensPerMonth, requestsPerDay, tripsPerMonth } = plan.limits;
+  const parts = [
+    plan.description,
+    `${tokensPerMonth.toLocaleString()} AI tokens per month`,
+    `${requestsPerDay} AI requests per day`,
+    formatTripsLimit(tripsPerMonth),
+    ...(plan.features || []),
+  ].filter(Boolean);
+
+  return parts.join(" · ").slice(0, 500);
+};
+
+const toStripeImages = (...urls) =>
+  [...new Set(urls.filter((u) => typeof u === "string" && u.startsWith("https://")))].slice(
+    0,
+    8
+  );
+
+const fulfillSubscriptionFromCheckout = async (session) => {
+  const { userId, subscriptionId, planName } = session.metadata || {};
+
+  if (!subscriptionId || !planName) {
+    logger.warn(
+      `[Stripe] checkout.session.completed missing metadata: ${session.id}`
+    );
+    return null;
+  }
+
+  const sub = await SubscriptionModel.findById(subscriptionId);
+  if (!sub) {
+    logger.warn(`[Stripe] Subscription not found: ${subscriptionId}`);
+    return null;
+  }
+
+  const plan = await PlanModel.findOne({ name: planName });
+  const stripeSubscriptionId = getStripeSubscriptionId(session);
+
+  if (sub.planName !== planName) {
+    sub.history.push({
+      fromPlan: sub.planName,
+      toPlan: planName,
+      reason: "stripe_checkout",
+    });
+  }
+
+  if (stripeSubscriptionId) sub.stripeSubscriptionId = stripeSubscriptionId;
+  sub.planName = planName;
+  sub.status = "active";
+  sub.startDate = new Date();
+  sub.endDate = null;
+  sub.canceledAt = null;
+  if (plan) sub.plan = plan._id;
+
+  await sub.save();
+
+  if (userId) {
+    await UserModel.findByIdAndUpdate(userId, { subscription: sub._id });
+  }
+
+  logger.info(
+    `[Stripe] Subscription upgraded to ${planName} for user ${userId || sub.user}`
+  );
+
+  return sub;
+};
 
 export const createSubscriptionCheckoutSession = async (userId, planName) => {
   const user = await UserModel.findById(userId);
@@ -48,22 +127,93 @@ export const createSubscriptionCheckoutSession = async (userId, planName) => {
   if (planName !== "pro") {
     throw new ApiError(`Price ID not configured for plan: ${planName}`, 500);
   }
+  const stripePrice = await stripe.prices.retrieve(priceId);
+
+  if (!stripePrice.active) {
+    throw new ApiError("Stripe price for this plan is inactive", 500);
+  }
+  if (stripePrice.type !== "recurring") {
+    throw new ApiError(
+      "Stripe price must be a recurring (monthly) subscription price. " +
+        "Create a recurring price in Stripe Dashboard and set STRIPE_PRICE_ID_PRO or plan.stripePriceId.monthly.",
+      500
+    );
+  }
+
+  const planImages = toStripeImages(process.env.RAHAL_LOGO_URL);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [
+      {
+        price_data: {
+          currency: stripePrice.currency,
+          unit_amount: stripePrice.unit_amount,
+          recurring: {
+            interval: stripePrice.recurring.interval,
+            interval_count: stripePrice.recurring.interval_count || 1,
+          },
+          product_data: {
+            name: `Rahal ${plan.displayName} Plan`,
+            description: buildPlanCheckoutDescription(plan),
+            ...(planImages.length ? { images: planImages } : {}),
+            metadata: { planName: plan.name },
+          },
+        },
+        quantity: 1,
+      },
+    ],
     mode: "subscription",
     success_url: `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.FRONTEND_URL}/subscription/cancel`,
+    custom_text: {
+      submit: {
+        message: `${plan.displayName}: ${plan.limits.tokensPerMonth.toLocaleString()} tokens/mo · ${formatTripsLimit(plan.limits.tripsPerMonth)}`,
+      },
+    },
     metadata: {
       userId: user._id.toString(),
       subscriptionId: subscription._id.toString(),
       planName,
     },
+    subscription_data: {
+      metadata: {
+        userId: user._id.toString(),
+        subscriptionId: subscription._id.toString(),
+        planName,
+      },
+    },
   });
 
   return { url: session.url, sessionId: session.id };
 };
+
+// Fallback: manually sync plan after checkout when webhooks can't reach localhost.
+// Disabled — plan upgrades are applied by handleSubscriptionWebhookEvent below.
+// export const verifyCheckoutSession = async (userId, sessionId) => {
+//   if (!sessionId) {
+//     throw new ApiError("sessionId is required", 400);
+//   }
+//
+//   const session = await stripe.checkout.sessions.retrieve(sessionId, {
+//     expand: ["subscription"],
+//   });
+//
+//   if (session.payment_status !== "paid") {
+//     throw new ApiError("Payment not completed yet", 400);
+//   }
+//
+//   if (session.metadata?.userId !== userId.toString()) {
+//     throw new ApiError("Not authorized for this checkout session", 403);
+//   }
+//
+//   const subscription = await fulfillSubscriptionFromCheckout(session);
+//   if (!subscription) {
+//     throw new ApiError("Failed to apply subscription upgrade", 500);
+//   }
+//
+//   return subscription.populate("plan", "name displayName price limits features");
+// };
 
 export const handleSubscriptionWebhookEvent = async (payload, sig) => {
   let event;
@@ -79,9 +229,14 @@ export const handleSubscriptionWebhookEvent = async (payload, sig) => {
     throw new ApiError(`Webhook signature verification failed: ${err.message}`, 400);
   }
 
+  logger.info(`[Stripe] Subscription webhook received: ${event.type}`);
+
   switch (event.type) {
     case "checkout.session.completed":
-      await handleCheckoutSessionCompleted(event.data.object);
+      await fulfillSubscriptionFromCheckout(event.data.object);
+      break;
+    case "customer.subscription.created":
+      await handleSubscriptionCreated(event.data.object);
       break;
     case "customer.subscription.updated":
       await handleSubscriptionUpdated(event.data.object);
@@ -102,17 +257,24 @@ export const handleSubscriptionWebhookEvent = async (payload, sig) => {
   return { received: true };
 };
 
-const handleCheckoutSessionCompleted = async (session) => {
-  const { userId, subscriptionId, planName } = session.metadata || {};
+const handleSubscriptionCreated = async (subscriptionObj) => {
+  const { userId, subscriptionId, planName } = subscriptionObj.metadata || {};
   if (!subscriptionId || !planName) return;
 
   const sub = await SubscriptionModel.findById(subscriptionId);
-  if (!sub) return;
+  if (!sub || sub.planName === planName) return;
 
   const plan = await PlanModel.findOne({ name: planName });
-  sub.stripeSubscriptionId = session.subscription;
+
+  sub.history.push({
+    fromPlan: sub.planName,
+    toPlan: planName,
+    reason: "stripe_subscription_created",
+  });
+  sub.stripeSubscriptionId = subscriptionObj.id;
   sub.planName = planName;
   sub.status = "active";
+  sub.startDate = new Date();
   if (plan) sub.plan = plan._id;
   await sub.save();
 

@@ -1,5 +1,7 @@
 import * as repo from "./hotel.repository.js";
 import ApiError from "../../utils/apiError.js";
+import { indexHotel } from "../../integrations/ai/pinecone.rag.js";
+import logger from "../../config/logger.js";
 
 const buildFilter = ({
   city,
@@ -147,7 +149,16 @@ export const createHotel = async (data) => {
       409
     );
 
-  return repo.create(data);
+  const hotel = await repo.create(data);
+
+  try {
+    await indexHotel(hotel);
+    logger.info(`[RAG] Indexed hotel ${hotel._id} in Pinecone`);
+  } catch (err) {
+    logger.warn(`[RAG] Failed to index hotel ${hotel._id}: ${err.message}`);
+  }
+
+  return hotel;
 };
 
 export const updateHotel = async (id, data) => {

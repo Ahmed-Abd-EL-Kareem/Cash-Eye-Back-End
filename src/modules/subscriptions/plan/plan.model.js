@@ -29,6 +29,7 @@ const planSchema = new mongoose.Schema(
     limits: {
       tokensPerMonth: { type: Number, required: true },
       requestsPerDay: { type: Number, required: true },
+      tripsPerMonth: { type: Number, default: null },
       maxFileUploads: { type: Number, default: 0 },
       maxFileSizeMB: { type: Number, default: 0 },
       allowedModels: {

@@ -3,6 +3,7 @@
 //       → send full conversation history → return reply + token usage
 
 import { chatClient } from "./openai.client.js";
+// import openai from "./openai.client.js";
 import { retrieveContext } from "./pinecone.rag.js";
 import { buildChatSystemPrompt, buildRagQuery } from "./prompt.engine.js";
 import ApiError from "../../utils/apiError.js";
@@ -50,8 +51,10 @@ export const chatWithRahal = async (messages) => {
 
   // ── Step 5: call OpenAI ──────────────────────────────────────────────────
   const response = await chatClient.chat.completions.create({
+  // const response = await openai.chat.completions.create({
     // model: "gpt-4o-mini",   // fast + cheap for conversational turns
-    model: "nvidia/nemotron-3-super-120b-a12b",   // fast + cheap for conversational turns
+    // model: "nvidia/nemotron-3-super-120b-a12b",   // fast + cheap for conversational turns
+    model: "openai/gpt-oss-120b",   // fast + cheap for conversational turns
     messages: [
       { role: "system", content: systemPrompt },
       ...trimmedHistory,

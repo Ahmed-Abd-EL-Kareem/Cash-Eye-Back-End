@@ -7,7 +7,6 @@ import {
 } from "./destination.validation.js";
 import { protect } from "../../middleware/auth.middleware.js";
 import { restrictTo } from "../../middleware/role.middleware.js";
-import { seedDestinations } from "../../seed/destinations.seed.js";
 
 const router = Router();
 
@@ -16,7 +15,6 @@ const router = Router();
 // IMPORTANT: specific string routes (/nearby, /slug/:slug) must come BEFORE
 // the wildcard param route (/:id), otherwise Express matches them as ObjectIds
 // and returns 400 "Invalid destination ID".
-router.get("/seed", seedDestinations)
 router.get("/nearby", destinationController.getNearbyDestinations);
 router.get("/slug/:slug", destinationController.getDestinationBySlug);
 router.get("/", destinationController.getDestinations);

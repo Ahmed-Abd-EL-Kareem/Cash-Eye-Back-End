@@ -14,9 +14,16 @@ router.post("/webhook", subscriptionPaymentController.handleSubscriptionWebhook)
 router.use(protect);
 // Protected routes
 router.get("/my", subscriptionController.getMySubscription);
+
+// PATCH /change-plan — manual plan switch WITHOUT Stripe payment.
+// Use ONLY for downgrading to "free" or admin/testing. Do NOT use to upgrade to "pro"
+// (that requires payment via POST /pay/upgrade + Stripe webhook).
 router.patch("/change-plan", subscriptionController.changePlan);
-// Payment routes for subscriptions (require authentication)
+
+// Payment routes — upgrade goes through Stripe Checkout; plan updates via webhook.
 router.post("/pay/upgrade", subscriptionPaymentController.upgradeSubscription);
+// router.post("/pay/verify", subscriptionPaymentController.verifySubscriptionPayment);
+// router.get("/pay/verify", subscriptionPaymentController.verifySubscriptionPayment);
 router.get("/pay/status/:subscriptionId", subscriptionPaymentController.getSubscriptionPaymentStatus);
 
 router.use(restrictTo("admin"));

@@ -1,17 +1,53 @@
-import {
-  createUser,
-  getAllUsers,
-  getUserById,
-  updateUserById,
-  deleteUserById,
-} from "./user.service.js";
+import asyncHandler from "../../utils/asyncHandler.js";
+import { successResponse, createdResponse } from "../../utils/apiResponse.js";
+import * as userService from "./user.service.js";
 
-export const createUsers = (req, res, next) => createUser(req, res, next);
+export const getUsers = asyncHandler(async (req, res) => {
+  const { users, total, page, limit } = await userService.getAllUsers(req.query);
 
-export const getUsers = (req, res, next) => getAllUsers(req, res, next);
+  successResponse(res, {
+    meta: {
+      results: users.length,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    },
+    data: { users },
+  });
+});
 
-export const getUser = (req, res, next) => getUserById(req, res, next);
+export const createUsers = asyncHandler(async (req, res) => {
+  const user = await userService.createUser(req.body);
 
-export const updateUser = (req, res, next) => updateUserById(req, res, next);
+  createdResponse(res, {
+    data: { user },
+  });
+});
 
-export const deleteUser = (req, res, next) => deleteUserById(req, res, next);
+export const getUser = asyncHandler(async (req, res) => {
+  const user = await userService.getUserById(req.params.id);
+
+  successResponse(res, {
+    data: { user },
+  });
+});
+
+export const updateUser = asyncHandler(async (req, res) => {
+  const user = await userService.updateUserById(req.params.id, req.body);
+
+  successResponse(res, {
+    data: { user },
+  });
+});
+
+export const deleteUser = asyncHandler(async (req, res) => {
+  await userService.deleteUserById(req.params.id);
+
+  res.status(204).json({
+    status: "success",
+    data: null,
+  });
+});

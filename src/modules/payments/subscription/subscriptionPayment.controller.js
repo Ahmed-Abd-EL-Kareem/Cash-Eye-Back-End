@@ -2,6 +2,7 @@ import asyncHandler from "../../../utils/asyncHandler.js";
 import * as subscriptionPaymentService from "./subscriptionPayment.service.js";
 import { successResponse, createdResponse } from "../../../utils/apiResponse.js";
 import ApiError from "../../../utils/apiError.js";
+import { getStripeWebhookPayload } from "../../../middleware/stripeWebhook.middleware.js";
 
 export const upgradeSubscription = asyncHandler(async (req, res) => {
   const { planName } = req.body;
@@ -23,14 +24,19 @@ export const upgradeSubscription = asyncHandler(async (req, res) => {
 
 export const handleSubscriptionWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
+  const payload = getStripeWebhookPayload(req);
 
   if (!sig) {
     return res.status(400).send("Webhook Error: No stripe-signature header");
   }
 
+  if (!payload) {
+    return res.status(400).send("Webhook Error: No webhook payload was provided.");
+  }
+
   try {
     await subscriptionPaymentService.handleSubscriptionWebhookEvent(
-      req.rawBody,
+      payload,
       sig
     );
     res.json({ received: true });
@@ -39,6 +45,22 @@ export const handleSubscriptionWebhook = async (req, res) => {
     res.status(400).send(`Webhook Error: ${err.message}`);
   }
 };
+
+// Fallback: manually sync plan after checkout when webhooks can't reach localhost.
+// Disabled — plan upgrades are applied by POST /subscriptions/webhook (Stripe).
+// export const verifySubscriptionPayment = asyncHandler(async (req, res) => {
+//   const sessionId = req.body.sessionId || req.query.session_id;
+//
+//   const subscription = await subscriptionPaymentService.verifyCheckoutSession(
+//     req.user._id,
+//     sessionId
+//   );
+//
+//   successResponse(res, {
+//     message: "Subscription upgraded successfully",
+//     data: { subscription },
+//   });
+// });
 
 export const getSubscriptionPaymentStatus = asyncHandler(async (req, res) => {
   const { subscriptionId } = req.params;

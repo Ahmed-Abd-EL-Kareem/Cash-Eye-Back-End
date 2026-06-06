@@ -8,19 +8,25 @@
 //   - retrieveContext() returns null so prompts work without RAG context
 
 // import openai from "./openai.client.js";
+import { embeddingClient } from "./openai.client.js";
 import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
 // import logger from "../../config/logger.js";
 
 // const EMBED_MODEL = "text-embedding-3-small"; // 1536 dimensions, fast + cheap
-const MIN_SCORE = 0.45;                     // relevance threshold — lower = more noise
-
 // ─── Embed a text string ──────────────────────────────────────────────────────
-import { embeddingClient } from "./openai.client.js";
+// import { embeddingClient } from "./openai.client.js";
 // import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
 import logger from "../../config/logger.js";
 
 const EMBED_MODEL = "text-embedding-3-small";
 
+// export const embedText = async (text) => {
+//   const response = await openai.embeddings.create({
+//     model: EMBED_MODEL,
+//     input: text.slice(0, 8000),
+//   });
+//   return response.data[0].embedding;
+// };
 export const embedText = async (text) => {
   const response = await embeddingClient.embeddings.create({
     model: EMBED_MODEL,
@@ -174,18 +180,56 @@ export const retrieveContext = async (query, topK = 5) => {
 };
 // ─── Build plain-text document for indexing ──────────────────────────────────
 // Converts a hotel or destination document into a searchable text blob.
+export const buildHotelIndexDoc = (doc) => ({
+  id: `hotel_${doc._id}`,
+  text: buildIndexText("hotel", doc),
+  metadata: {
+    id: doc._id.toString(),
+    city: doc.city,
+    slug: doc.slug || "",
+    name_en: doc.name?.en || "",
+    name_ar: doc.name?.ar || "",
+    description_en: doc.description?.en || "",
+    description_ar: doc.description?.ar || "",
+  },
+});
+
+export const buildDestinationIndexDoc = (doc) => ({
+  id: `dest_${doc._id}`,
+  text: buildIndexText("destination", doc),
+  metadata: {
+    id: doc._id.toString(),
+    city: doc.city,
+    region: doc.region || "",
+    category: doc.category || "",
+    slug: doc.slug || "",
+    name_en: doc.name?.en || "",
+    name_ar: doc.name?.ar || "",
+    description_en: doc.description?.en || "",
+    description_ar: doc.description?.ar || "",
+  },
+});
+
+export const indexHotel = async (doc) =>
+  upsertDocuments([buildHotelIndexDoc(doc)]);
+
+export const indexDestination = async (doc) =>
+  upsertDocuments([buildDestinationIndexDoc(doc)]);
+
 export const buildIndexText = (type, data) => {
   if (type === "hotel") {
     const amenities = data.amenities?.slice(0, 8).join(", ") || "N/A";
+    const roomTypes = data.rooms?.map((r) => r.type).join(", ") || "N/A";
     return [
-      `Hotel: ${data.name}`,
+      `Hotel: ${data.name?.en || data.name}`,
+      data.name?.ar ? `Arabic name: ${data.name.ar}` : "",
       `City: ${data.city}`,
-      `Type: ${data.type || "hotel"}`,
-      `Rating: ${data.rating}/5 (${data.reviews} reviews)`,
-      `Price per night: EGP ${data.pricePerNight}`,
-      `Location rating: ${data.locationRating}/5`,
+      `Stars: ${data.stars}/5`,
+      `Price per night: ${data.currency || "EGP"} ${data.averagePricePerNight}`,
+      `Room types: ${roomTypes}`,
       `Amenities: ${amenities}`,
-    ].join(". ");
+      data.description?.en ? `Description: ${data.description.en}` : "",
+    ].filter(Boolean).join(". ");
   }
 
   if (type === "destination") {

@@ -1,5 +1,7 @@
 import * as repo from "./destination.repository.js";
 import ApiError from "../../utils/apiError.js";
+import { indexDestination } from "../../integrations/ai/pinecone.rag.js";
+import logger from "../../config/logger.js";
 
 // ─── Build MongoDB filter from query params ───────────────────────────────────
 // Supported params:
@@ -122,7 +124,16 @@ export const createDestination = async (data) => {
   const existing = await repo.findBySlug(data.slug);
   if (existing) throw new ApiError("A destination with this slug already exists", 409);
 
-  return repo.create(data);
+  const destination = await repo.create(data);
+
+  try {
+    await indexDestination(destination);
+    logger.info(`[RAG] Indexed destination ${destination._id} in Pinecone`);
+  } catch (err) {
+    logger.warn(`[RAG] Failed to index destination ${destination._id}: ${err.message}`);
+  }
+
+  return destination;
 };
 
 // ─── Update ───────────────────────────────────────────────────────────────────

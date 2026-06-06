@@ -82,6 +82,7 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subscription",
     },
+    savedTrips: [{ type: mongoose.Schema.Types.ObjectId, ref: "Trip" }],
     otp: String,
     resetOTPExpiration: Date,
   },

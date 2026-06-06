@@ -16,6 +16,21 @@ const sendErrorDev = (err, req, res) => {
   });
 };
 
+const sendErrorProd = (err, req, res) => {
+  if (err.isOperational) {
+    return res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message,
+    });
+  }
+
+  console.error("ERROR:", err);
+  return res.status(500).json({
+    status: "error",
+    message: "Something went wrong",
+  });
+};
+
 export const globalErrorHandler = (err, req, res, next) => {
   let error = Object.assign(err, { message: err.message });
 
@@ -24,7 +39,11 @@ export const globalErrorHandler = (err, req, res, next) => {
   error.statusCode = error.statusCode || 500;
   error.status = error.status || "Error";
 
-  sendErrorDev(error, req, res);
+  if (process.env.NODE_ENV === "development") {
+    sendErrorDev(error, req, res);
+  } else {
+    sendErrorProd(error, req, res);
+  }
 };
 
 export default globalErrorHandler;

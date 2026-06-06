@@ -11,6 +11,7 @@ import corsOptions from "./src/config/cors.js";
 import { requestLogger } from "./src/config/logger.js";
 import passport from "./src/config/passport.js";
 import { globalLimiter } from "./src/middleware/rateLimit.middleware.js";
+import { stripeWebhookBodyParser } from "./src/middleware/stripeWebhook.middleware.js";
 import { globalErrorHandler } from "./src/middleware/error.middleware.js";
 import ApiError from "./src/utils/apiError.js";
 import apiRoutes from "./src/routes/index.js";
@@ -23,21 +24,17 @@ if (process.env.NODE_ENV === "development") {
 app.use(requestLogger);
 app.use(cors(corsOptions));
 
-// Preserve raw body for Stripe webhook signature verification
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      if (req.originalUrl?.includes("/webhook")) {
-        req.rawBody = buf;
-      }
-    },
-  })
-);
+// Webhook routes use raw body; all other routes use express.json()
+app.use(stripeWebhookBodyParser);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(helmet());
 app.use(compression());
 app.use((req, res, next) => {
+  if (req.originalUrl?.includes("/webhook")) {
+    return next();
+  }
+
   const sanitize = (obj) => {
     if (!obj || typeof obj !== "object") return;
 

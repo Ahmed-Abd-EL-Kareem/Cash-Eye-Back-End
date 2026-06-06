@@ -10,8 +10,8 @@ router.use(protect);
 
 // String routes BEFORE /:id
 router.get("/admin/all", restrictTo("admin"), tripController.adminGetAllTrips);
-// router.post("/generate", checkAIQuota(true), tripController.generateTrip);
-router.post("/generate", tripController.generateTrip);
+router.post("/generate", checkAIQuota(true), tripController.generateTrip);
+// router.post("/generate", tripController.generateTrip);
 
 router.get("/", tripController.getMyTrips);
 router.get("/:id", tripController.getTripById);

@@ -1,5 +1,5 @@
 // AI Usage Middleware
-// Checks quota BEFORE any AI route runs and increments usage counters.
+// Checks quota BEFORE any AI route runs; increments usage AFTER a successful response.
 // Two quota types:
 //   requestsToday    — applies to ALL AI routes (chat + trip generation)
 //   tripsThisMonth   — applies only to trip generation (isTripGeneration=true)
@@ -13,8 +13,17 @@ import ApiError from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import logger from "../config/logger.js";
 
-// Free plan trip limit per month
-const FREE_TRIPS_PER_MONTH = 3;
+export const recordAIUsage = async (subscription, { isTripGeneration = false } = {}) => {
+  subscription.usage.requestsToday += 1;
+  subscription.usage.lastRequestDate = new Date();
+
+  if (isTripGeneration) {
+    subscription.usage.tripsThisMonth =
+      (subscription.usage.tripsThisMonth || 0) + 1;
+  }
+
+  await subscription.save();
+};
 
 export const checkAIQuota = (isTripGeneration = false) =>
   asyncHandler(async (req, res, next) => {
@@ -38,7 +47,7 @@ export const checkAIQuota = (isTripGeneration = false) =>
       subscription.checkAndResetTrips();
     }
 
-    const { requestsPerDay } = subscription.plan.limits;
+    const { requestsPerDay, tripsPerMonth } = subscription.plan.limits;
 
     // ── Check daily request quota (all AI features) ───────────────────────
     if (subscription.usage.requestsToday >= requestsPerDay) {
@@ -54,9 +63,10 @@ export const checkAIQuota = (isTripGeneration = false) =>
     if (isTripGeneration) {
       const tripsThisMonth = subscription.usage.tripsThisMonth || 0;
       const tripsLimit =
-        subscription.planName === "free" ? FREE_TRIPS_PER_MONTH : Infinity;
+        subscription.plan.limits.tripsPerMonth ??
+        (subscription.planName === "free" ? 3 : Infinity);
 
-      if (tripsThisMonth >= tripsLimit) {
+      if (tripsLimit !== Infinity && tripsThisMonth >= tripsLimit) {
         return next(
           new ApiError(
             `Monthly trip limit reached (${tripsLimit} trips/month on the free plan). Upgrade to Traveler for unlimited trips.`,
@@ -64,24 +74,15 @@ export const checkAIQuota = (isTripGeneration = false) =>
           )
         );
       }
-
-      // Increment trip counter
-      subscription.usage.tripsThisMonth =
-        (subscription.usage.tripsThisMonth || 0) + 1;
     }
 
-    // ── Increment daily request counter ───────────────────────────────────
-    subscription.usage.requestsToday += 1;
-    subscription.usage.lastRequestDate = new Date();
-    await subscription.save();
-
-    // Attach subscription to request for downstream use
     req.subscription = subscription;
+    req.isTripGeneration = isTripGeneration;
 
     logger.info(
       `[AIUsage] user=${req.user._id} requests_today=${subscription.usage.requestsToday}/${requestsPerDay}` +
       (isTripGeneration
-        ? ` trips_month=${subscription.usage.tripsThisMonth}`
+        ? ` trips_month=${subscription.usage.tripsThisMonth || 0}/${tripsPerMonth ?? "unlimited"}`
         : "")
     );
 
