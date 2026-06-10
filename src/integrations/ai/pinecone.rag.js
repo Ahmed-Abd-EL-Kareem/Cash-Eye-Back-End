@@ -20,6 +20,17 @@ import logger from "../../config/logger.js";
 
 const EMBED_MODEL = "text-embedding-3-small";
 
+export const normalizeDocId = (id) => {
+  if (id == null) return "";
+  if (typeof id === "object" && id.$oid) return String(id.$oid);
+  return String(id);
+};
+
+export const normalizeSeedDoc = (doc) => ({
+  ...doc,
+  _id: normalizeDocId(doc._id),
+});
+
 // export const embedText = async (text) => {
 //   const response = await openai.embeddings.create({
 //     model: EMBED_MODEL,
@@ -75,24 +86,72 @@ export const upsertDocuments = async (docs) => {
 
   try {
     const records = await Promise.all(
-      docs.map(async (doc) => ({
-        id: doc.id || doc._id?.toString(),
+      docs.map(async (doc) => (
+        // console.log(doc.id)
+        // console.log(doc.id.startsWith("dest"))
+        (doc.id.startsWith("dest"))? {
+          id: doc.id || normalizeDocId(doc._id),
+          values: await embedText(doc.text),
+          metadata: {
+            id: doc.metadata?.id || normalizeDocId(doc._id),
+            city: doc.metadata?.city || "",
+            category: doc.metadata?.category || "",
+            region: doc.metadata?.region || "",
+            slug: doc.metadata?.slug || "",
+            averageBudgetPerDay: doc.metadata?.averageBudgetPerDay ||"",
+            name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+            name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+  
+            description_en:
+              doc.metadata?.description?.en || doc.metadata?.description_en || "",
+            description_ar:
+              doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+            text: doc.text,
+          },
+        }
+        :{
+        id: doc.id || normalizeDocId(doc._id),
         values: await embedText(doc.text),
         metadata: {
-          id: doc.id || doc._id?.toString(),
+          id: doc.metadata?.id || normalizeDocId(doc._id),
           city: doc.metadata?.city || "",
-          category: doc.metadata?.category || "",
-          region: doc.metadata?.region || "",
+          averagePricePerNight: doc.metadata?.averagePricePerNight || "",
+          stars: doc.metadata?.stars || "",
           slug: doc.metadata?.slug || "",
+          currency: doc.metadata?.currency||"",
+          name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+          name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
 
-          name_en: doc.metadata?.name_en || "",
-          name_ar: doc.metadata?.name_ar || "",
-
-          description_en: doc.metadata?.description_en || "",
-          description_ar: doc.metadata?.description_ar || "",
+          description_en:
+            doc.metadata?.description?.en || doc.metadata?.description_en || "",
+          description_ar:
+            doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
           text: doc.text,
         },
-      }))
+      }
+
+    )
+    )
+      // docs.map(async (doc) => ({
+      //   id: doc.id || normalizeDocId(doc._id),
+      //   values: await embedText(doc.text),
+      //   metadata: {
+      //     id: doc.metadata?.id || normalizeDocId(doc._id),
+      //     city: doc.metadata?.city || "",
+      //     category: doc.metadata?.category || "",
+      //     region: doc.metadata?.region || "",
+      //     slug: doc.metadata?.slug || "",
+
+      //     name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+      //     name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+
+      //     description_en:
+      //       doc.metadata?.description?.en || doc.metadata?.description_en || "",
+      //     description_ar:
+      //       doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+      //     text: doc.text,
+      //   },
+      // }))
     );
 
     if (!records.length) {
@@ -180,35 +239,46 @@ export const retrieveContext = async (query, topK = 5) => {
 };
 // ─── Build plain-text document for indexing ──────────────────────────────────
 // Converts a hotel or destination document into a searchable text blob.
-export const buildHotelIndexDoc = (doc) => ({
-  id: `hotel_${doc._id}`,
-  text: buildIndexText("hotel", doc),
-  metadata: {
-    id: doc._id.toString(),
-    city: doc.city,
-    slug: doc.slug || "",
-    name_en: doc.name?.en || "",
-    name_ar: doc.name?.ar || "",
-    description_en: doc.description?.en || "",
-    description_ar: doc.description?.ar || "",
-  },
-});
+export const buildHotelIndexDoc = (doc) => {
+  const id = normalizeDocId(doc._id);
+  return {
+    id: `hotel_${id}`,
+    text: buildIndexText("hotel", doc),
+    metadata: {
+      id,
+      city: doc.city,
+      averagePricePerNight: doc.averagePricePerNight,
+      currency: doc.currency,
+      stars: doc.stars,
+      slug: doc.slug || "",
+      name_en: doc.name?.en || "",
+      name_ar: doc.name?.ar || "",
+      description_en: doc.description?.en || "",
+      description_ar: doc.description?.ar || "",
+    },
+  };
+};
 
-export const buildDestinationIndexDoc = (doc) => ({
-  id: `dest_${doc._id}`,
-  text: buildIndexText("destination", doc),
-  metadata: {
-    id: doc._id.toString(),
-    city: doc.city,
-    region: doc.region || "",
-    category: doc.category || "",
-    slug: doc.slug || "",
-    name_en: doc.name?.en || "",
-    name_ar: doc.name?.ar || "",
-    description_en: doc.description?.en || "",
-    description_ar: doc.description?.ar || "",
-  },
-});
+export const buildDestinationIndexDoc = (doc) => {
+  const id = normalizeDocId(doc._id);
+  return {
+    id: `dest_${id}`,
+    text: buildIndexText("destination", doc),
+    metadata: {
+      id,
+      city: doc.city,
+      region: doc.region || "",
+      category: doc.category || "",
+      slug: doc.slug || "",
+      name_en: doc.name?.en || "",
+      name_ar: doc.name?.ar || "",
+      averageBudgetPerDay: doc.averageBudgetPerDay || "",
+      currency: doc.currency || "",
+      description_en: doc.description?.en || "",
+      description_ar: doc.description?.ar || "",
+    },
+  };
+};
 
 export const indexHotel = async (doc) =>
   upsertDocuments([buildHotelIndexDoc(doc)]);

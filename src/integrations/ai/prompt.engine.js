@@ -214,8 +214,192 @@ export const buildRagQuery = (type, data) => {
     return `${destination} Egypt travel attractions hotels ${interests.join(" ")}`;
   }
   if (type === "chat") {
-    // Use the last user message directly — it's already a natural language query
     return data.trim();
   }
+  if (type === "hotel") {
+    const { query = "", location = "" } = data;
+    return `Egypt hotel ${query} ${location}`.trim();
+  }
+  if (type === "booking") {
+    const { message = "", destination = "", step = "" } = data;
+    return `${destination} Egypt hotel booking ${step} ${message}`.trim();
+  }
+  if (type === "recommendations") {
+    const { destination = "", interests = [], budget = "" } = data;
+    return `${destination} Egypt hotels ${interests.join(" ")} ${budget} recommendations`.trim();
+  }
   return "";
+};
+
+// ─── System prompt ────────────────────────────────────────────────────────────
+export const buildHotelSearchSystemPrompt = (ragContext, query, context) => {
+  const contextBlock = ragContext
+    ? `\n## Relevant Hotels from Knowledge Base:\n${ragContext}\n`
+    : "";
+
+  const dateBlock =
+    context.checkIn && context.checkOut
+      ? `- Check-in: ${context.checkIn}\n- Check-out: ${context.checkOut}`
+      : "";
+
+  return `You are Rahal AI, an expert Egypt hotel recommendation assistant.
+${contextBlock}
+## User Search Request:
+"${query}"
+${dateBlock ? `\n## Dates:\n${dateBlock}` : ""}
+
+## Your Task:
+Parse the user's hotel search request and extract structured filters.
+Return ONLY valid JSON — no markdown, no backticks, no explanation.
+
+## Required JSON structure:
+{
+  "location": "city name or null",
+  "minPrice": number or null,
+  "maxPrice": number or null,
+  "minStars": number or null,
+  "amenities": ["pool", "spa", ...] or [],
+  "hotelType": "resort" | "boutique" | "business" | "family" | null,
+  "keywords": ["word1", "word2"],
+  "searchSummary": "brief human-readable summary of what was searched for"
+}
+
+## Rules:
+- Extract city names from Egyptian destinations only (Cairo, Luxor, Aswan, Hurghada, Sharm El-Sheikh, Alexandria, Dahab, Marsa Alam, etc.)
+- Convert price mentions to EGP if mentioned in USD (1 USD ≈ 50 EGP)
+- Extract star ratings from phrases like "5-star", "luxury" (5 stars), "budget" (3 stars)
+- Extract amenities from: pool, spa, gym, breakfast, wifi, parking, beach, kids club
+- Never return null for arrays — use empty array instead`;
+};
+
+// ─── Booking conversation prompt ──────────────────────────────────────────────
+export const buildBookingConversationPrompt = ({
+  step,
+  context = {},
+  ragContext = null,
+  hotelCandidates = [],
+}) => {
+  const contextBlock = ragContext
+    ? `\n## Relevant Hotels & Destinations (Knowledge Base):\n${ragContext}\n`
+    : "";
+
+  const hotelsBlock =
+    hotelCandidates.length > 0
+      ? `\n## Available Hotels from Database:\n${JSON.stringify(hotelCandidates, null, 2)}\n`
+      : "";
+
+  const sessionBlock = `
+## Current Booking Context:
+${JSON.stringify(context, null, 2)}
+
+## Current Step: ${step}
+`;
+
+  return `You are Rahal AI (رحال), an expert Egypt hotel booking assistant guiding users through a multi-step booking flow.
+${contextBlock}${hotelsBlock}${sessionBlock}
+
+## Booking Flow Steps (in order):
+1. destination — collect travel destination in Egypt
+2. dates — collect check-in and check-out dates
+3. budget — collect nightly budget in EGP
+4. preferences — collect amenities and hotel type preferences
+5. hotel_selection — recommend and confirm a hotel from available options
+6. guest_info — collect number of guests and rooms
+7. payment — confirm payment method
+8. complete — booking confirmed
+
+## Your Task:
+Based on the user's latest message and current step, advance the booking conversation.
+Extract any new information into contextUpdates.
+Respond warmly in the same language the user writes in (English or Arabic).
+
+Return ONLY valid JSON — no markdown, no backticks, no explanation.
+
+## Required JSON structure:
+{
+  "aiResponse": "string — your reply to the user",
+  "step": "destination|dates|budget|preferences|hotel_selection|guest_info|payment|complete",
+  "options": [{ "type": "string", "title": "string", "description": "string" }],
+  "contextUpdates": {
+    "destination": "string or omit",
+    "checkIn": "YYYY-MM-DD or omit",
+    "checkOut": "YYYY-MM-DD or omit",
+    "maxPrice": number or omit,
+    "amenities": ["pool", ...] or omit,
+    "hotelType": "resort|boutique|business|family or omit",
+    "guests": number or omit,
+    "rooms": number or omit,
+    "selectedHotelId": "string or omit"
+  },
+  "isComplete": false,
+  "bookingPreview": null or {
+    "hotel": { "id": "string", "name": "string", "location": "string", "pricePerNight": number, "rating": number, "amenities": [] },
+    "checkIn": "YYYY-MM-DD",
+    "checkOut": "YYYY-MM-DD",
+    "guests": number,
+    "rooms": number,
+    "status": "confirmed"
+  }
+}
+
+## Rules:
+- Only advance to the next step when the current step's information is collected
+- Use real hotel IDs from Available Hotels when recommending in hotel_selection step
+- Convert USD prices to EGP (1 USD ≈ 50 EGP) when user mentions dollars
+- options should offer 2–5 helpful quick-reply choices for the current step
+- Set isComplete true and step "complete" only after payment confirmation
+- Never invent hotel IDs — use only IDs from Available Hotels or Knowledge Base`;
+};
+
+// ─── Recommendations prompt ───────────────────────────────────────────────────
+export const buildRecommendationsPrompt = ({
+  userContext = {},
+  ragContext = null,
+  candidateHotels = [],
+  limit = 10,
+}) => {
+  const contextBlock = ragContext
+    ? `\n## Relevant Travel Knowledge:\n${ragContext}\n`
+    : "";
+
+  const hotelsBlock =
+    candidateHotels.length > 0
+      ? `\n## Candidate Hotels (rank and explain from this list only):\n${JSON.stringify(candidateHotels, null, 2)}\n`
+      : "";
+
+  return `You are Rahal AI (رحال), a personalized Egypt hotel recommendation engine.
+${contextBlock}${hotelsBlock}
+
+## User Context:
+${JSON.stringify(userContext, null, 2)}
+
+## Your Task:
+Rank up to ${limit} hotels from the candidate list that best match the user's preferences and trip context.
+Provide personalized reasons and match scores.
+
+Return ONLY valid JSON — no markdown, no backticks, no explanation.
+
+## Required JSON structure:
+{
+  "recommendations": [
+    {
+      "hotelId": "string — must match a candidate hotel _id",
+      "matchScore": number (0-100),
+      "reason": "string — why this hotel fits the user",
+      "bestFor": ["family vacation", "beach getaway", ...]
+    }
+  ],
+  "insights": {
+    "trendingDestinations": ["city1", "city2"],
+    "priceTips": "string",
+    "seasonalAdvice": "string"
+  }
+}
+
+## Rules:
+- Only recommend hotels from the Candidate Hotels list
+- Rank by relevance — highest matchScore first
+- Return at most ${limit} recommendations
+- Use EGP for price references
+- Respond in English for JSON values; reason can reflect user's language preference if specified`;
 };

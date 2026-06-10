@@ -3,14 +3,12 @@ import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
 import { seedPlans } from "./src/modules/subscriptions/plan/plan.service.js";
 
-
 const port = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
     await connectDB();
     await seedPlans();
-
 
     app.listen(port, () => {
       console.log(`Rahal API running at http://localhost:${port}`);

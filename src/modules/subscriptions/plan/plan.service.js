@@ -1,5 +1,5 @@
 import PlanModel from "./plan.model.js";
-
+// ToDo: Execute The Plans
 export const seedPlans = async () => {
   const count = await PlanModel.countDocuments();
   if (count === 0) {

@@ -12,9 +12,9 @@ const run = async () => {
   await mongoose.connect(process.env.MONGO_DATABASE_URL);
   console.log("🔌 Connected to MongoDB");
 
-  await seedPlans();
-  await seedDestinations();
+  // await seedPlans();
   await seedHotels();
+  await seedDestinations();
 
   console.log("✅ All seeds complete");
   await mongoose.disconnect();

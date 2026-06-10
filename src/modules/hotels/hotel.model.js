@@ -21,7 +21,7 @@ const roomSchema = new mongoose.Schema(
       min: 1,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // ─── Main Hotel Schema ───────────────────────────────────────
@@ -131,7 +131,7 @@ const hotelSchema = new mongoose.Schema(
   {
     timestamps: true,
     versionKey: false,
-  }
+  },
 );
 
 // ─── Auto Slug ───────────────────────────────────────────────
