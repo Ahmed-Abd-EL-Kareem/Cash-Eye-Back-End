@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
-const sendWelcomeEmail = async ({ to, subject, html }) => {
-  const transporter = nodemailer.createTransport({
+const createGmailTransport = () =>
+  nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.SMTP_USER,
@@ -9,8 +9,11 @@ const sendWelcomeEmail = async ({ to, subject, html }) => {
     },
   });
 
+const sendWelcomeEmail = async ({ to, subject, html }) => {
+  const transporter = createGmailTransport();
+
   const info = await transporter.sendMail({
-    from: `"Rahal" <${process.env.SMTP_USER || "noreply@rahal.travel"}>`,
+    from: `"Rahal" <${process.env.SMTP_USER}>`,
     to,
     subject,
     html,
@@ -21,20 +24,10 @@ const sendWelcomeEmail = async ({ to, subject, html }) => {
 };
 
 const sendForgetEmail = async (option) => {
-  const port = Number(process.env.SMTP_PORT);  // ✅ define port first
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: port,
-    secure: port === 465,               // ✅ now `port` is defined
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  const transporter = createGmailTransport();
 
   await transporter.sendMail({
-    from: `"Rahal" <${process.env.SMTP_USER || "noreply@rahal.travel"}>`,
+    from: `"Rahal" <${process.env.SMTP_USER}>`,
     to: option.email,
     subject: option.subject,
     html: option.message,
