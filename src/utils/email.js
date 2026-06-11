@@ -21,10 +21,12 @@ const sendWelcomeEmail = async ({ to, subject, html }) => {
 };
 
 const sendForgetEmail = async (option) => {
+  const port = Number(process.env.SMTP_PORT);  // ✅ define port first
+
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: port === 465,
+    port: port,
+    secure: port === 465,               // ✅ now `port` is defined
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
