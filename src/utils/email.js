@@ -1,35 +1,42 @@
 import nodemailer from "nodemailer";
 
-const createBrevoTransport = () =>
-  nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
+const sendWelcomeEmail = async ({ to, subject, html }) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
     auth: {
-      user: process.env.BREVO_SMTP_USER,
-      pass: process.env.BREVO_SMTP_PASS,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
   });
 
-const sendWelcomeEmail = async ({ to, subject, html }) => {
-  const transporter = createBrevoTransport();
   const info = await transporter.sendMail({
-    from: `"Rahal" <ahmed.20003.ayman@gmail.com>`, // verified individual sender
+    from: `"Rahal" <${process.env.SMTP_USER || "noreply@rahal.travel"}>`,
     to,
     subject,
     html,
   });
+
   console.log("Email sent successfully:", info.messageId);
   return info;
 };
 
 const sendForgetEmail = async (option) => {
-  const transporter = createBrevoTransport();
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
   await transporter.sendMail({
-    from: `"Rahal" <ahmed.20003.ayman@gmail.com>`, // verified individual sender
+    from: `"Rahal" <${process.env.SMTP_USER || "noreply@rahal.travel"}>`,
     to: option.email,
     subject: option.subject,
     html: option.message,
   });
 };
+
 export { sendForgetEmail, sendWelcomeEmail };
