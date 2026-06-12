@@ -109,10 +109,11 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
       status: "success",
       message: "If that email is registered, a reset code has been sent.",
     });
-  } catch {
+  } catch (err) {
     user.otp = undefined;
     user.resetOTPExpiration = undefined;
     await user.save({ validateBeforeSave: false });
+    console.error("Error sending email:", err.message);
     return next(new ApiError("Error sending email. Please try again later.", 500));
   }
 });
