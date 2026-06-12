@@ -16,7 +16,7 @@ import { globalErrorHandler } from "./src/middleware/error.middleware.js";
 import ApiError from "./src/utils/apiError.js";
 import apiRoutes from "./src/routes/index.js";
 const app = express();
-
+app.set("trust proxy", 1);
 if (process.env.NODE_ENV === "development") {
   console.log("NODE_ENV:", process.env.NODE_ENV);
 }
