@@ -85,6 +85,10 @@ const userSchema = new mongoose.Schema(
     savedTrips: [{ type: mongoose.Schema.Types.ObjectId, ref: "Trip" }],
     otp: String,
     resetOTPExpiration: Date,
+    isOTPVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

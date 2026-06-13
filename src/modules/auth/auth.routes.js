@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post("/signup", AuthController.register);
 router.post("/forgot-password", AuthController.forgotPass);
+router.post("/verify-otp", AuthController.verifyOtp);
 router.post("/reset-password", AuthController.resetPass);
 router.post("/login", AuthController.loginUser);
 

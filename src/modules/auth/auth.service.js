@@ -117,34 +117,70 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
     return next(new ApiError("Error sending email. Please try again later.", 500));
   }
 });
+export const verifyOTP = asyncHandler(async (req, res, next) => {
+  const { email, otp } = req.body;
 
-export const resetPassword = asyncHandler(async (req, res, next) => {
-  const { email, otp, newPassword } = req.body;
-
-  if (!email || !otp || !newPassword) {
-    return next(new ApiError("Email, OTP, and new password are required.", 400));
+  if (!email || !otp) {
+    return next(new ApiError("Email and OTP are required.", 400));
   }
 
   const user = await UserModel.findOne({ email });
 
   if (!user || !user.otp || user.resetOTPExpiration < Date.now()) {
-    return next(new ApiError("OTP is invalid or has expired.", 400));
+    return next(new ApiError("OTP is invalid or expired.", 400));
   }
 
-  const isValid = await bcrypt.compare(otp.toString(), user.otp);
-  if (!isValid) return next(new ApiError("Invalid OTP.", 400));
+  const isValid = await bcrypt.compare(
+    otp.toString(),
+    user.otp
+  );
+
+  if (!isValid) {
+    return next(new ApiError("Invalid OTP.", 400));
+  }
+
+  user.isOTPVerified = true;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    status: "success",
+    message: "OTP verified successfully",
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res, next) => {
+  const { email, newPassword } = req.body;
+
+  if (!email || !newPassword) {
+    return next(
+      new ApiError("Email and new password are required.", 400)
+    );
+  }
+
+  const user = await UserModel.findOne({ email });
+
+  if (!user) {
+    return next(new ApiError("User not found.", 404));
+  }
+
+  if (!user.isOTPVerified) {
+    return next(
+      new ApiError("Please verify OTP first.", 400)
+    );
+  }
 
   user.password = newPassword;
   user.otp = undefined;
   user.resetOTPExpiration = undefined;
+  user.isOTPVerified = false;
+
   await user.save();
 
   res.status(200).json({
     status: "success",
-    message: "Password successfully reset. Please log in.",
+    message: "Password reset successfully",
   });
 });
-
 export const googleCallback = asyncHandler(async (req, res) => {
   const token = generateToken(req.user._id);
   sendCookie(res, token);
