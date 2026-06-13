@@ -6,12 +6,11 @@ import {
   validateObjectId,
   validateCreateHotel,
 } from "./hotel.validation.js";
-import { protect } from "../../middleware/auth.middleware.js";
-import { restrictTo } from "../../middleware/role.middleware.js";
+import { seedHotels } from "../../seed/hotels.seed.js";
 
 const router = Router();
 
-router.get("/meta", hotelController.getHotelMeta);
+// router.get("/seed", seedHotels)
 // Public
 router.get("/", hotelController.getHotels);
 
@@ -32,8 +31,6 @@ router.get(
 );
 
 // Admin
-router.use(protect, restrictTo("admin"));
-
 router.post(
   "/",
   validateCreateHotel,

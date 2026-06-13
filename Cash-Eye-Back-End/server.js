@@ -1,11 +1,12 @@
-import dns from 'node:dns';
+import dns from "node:dns";
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 import "./src/config/env.js";
 import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
-import { seedPlans } from "./src/modules/subscriptions/plan/plan.service.js";
+import { seedPlans } from "./src/modules/plans/plan.service.js";
+
 
 const port = process.env.PORT || 3000;
 
@@ -13,6 +14,7 @@ const startServer = async () => {
   try {
     await connectDB();
     await seedPlans();
+
 
     app.listen(port, () => {
       console.log(`Rahal API running at http://localhost:${port}`);
@@ -24,3 +26,4 @@ const startServer = async () => {
 };
 
 startServer();
+

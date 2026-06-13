@@ -1,7 +1,5 @@
 import * as repo from "./hotel.repository.js";
 import ApiError from "../../utils/apiError.js";
-import { indexHotel } from "../../integrations/ai/pinecone.rag.js";
-import logger from "../../config/logger.js";
 
 const buildFilter = ({
   city,
@@ -66,7 +64,7 @@ export const getAllHotels = async (query = {}) => {
     createdAt: -1,
   };
 
-  const filter =await buildFilter(query);
+  const filter = buildFilter(query);
 
   const [hotels, total] = await Promise.all([
     repo.findAll({
@@ -149,16 +147,7 @@ export const createHotel = async (data) => {
       409
     );
 
-  const hotel = await repo.create(data);
-
-  try {
-    await indexHotel(hotel);
-    logger.info(`[RAG] Indexed hotel ${hotel._id} in Pinecone`);
-  } catch (err) {
-    logger.warn(`[RAG] Failed to index hotel ${hotel._id}: ${err.message}`);
-  }
-
-  return hotel;
+  return repo.create(data);
 };
 
 export const updateHotel = async (id, data) => {
@@ -177,21 +166,4 @@ export const deleteHotel = async (id) => {
     throw new ApiError("Hotel not found", 404);
 
   await repo.softDeleteById(id);
-};
-
-
-export const getHotelMeta = async () => {
-  const [cities, regions, amenities] = await Promise.all([
-    repo.getDistinct("city",      { isActive: true }),
-    repo.getDistinct("region",    { isActive: true }),
-    repo.getDistinct("amenities", { isActive: true }),
-  ]);
-
-  return {
-    cities:    cities.filter(Boolean).sort(),
-    regions:   regions.filter(Boolean).sort(),
-    amenities: amenities.filter(Boolean).sort(),
-    roomTypes:  ["single", "double", "suite", "family"],
-    currencies: ["EGP", "USD"],
-  };
 };
