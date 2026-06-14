@@ -57,6 +57,7 @@ export const searchHotels = asyncHandler(async (req, res) => {
 
 // POST /api/v1/ai/bookings/conversation
 // Body: { message: "string", sessionId: "string (optional)", context: { tripId, currentStep } }
+// POST /api/v1/ai/bookings/conversation
 export const bookingConversation = asyncHandler(async (req, res) => {
   const { message, sessionId, context } = req.body;
 
@@ -64,7 +65,13 @@ export const bookingConversation = asyncHandler(async (req, res) => {
     throw new ApiError("message is required", 400);
   }
 
-  const result = await aiService.bookingConversation(message, sessionId, context || {});
+  // ✅ Inject userId from auth middleware so booking agent can save to DB
+  const enrichedContext = {
+    ...(context || {}),
+    userId: req.user._id,
+  };
+
+  const result = await aiService.bookingConversation(message, sessionId, enrichedContext);
 
   await recordAIUsage(req.subscription, { isTripGeneration: false });
 
@@ -73,7 +80,6 @@ export const bookingConversation = asyncHandler(async (req, res) => {
     data: result,
   });
 });
-
 // GET /api/v1/ai/hotels/recommendations
 // Query: ?tripId=string&limit=number&context=JSON string
 export const getRecommendations = asyncHandler(async (req, res) => {

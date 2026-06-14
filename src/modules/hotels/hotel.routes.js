@@ -33,6 +33,8 @@ router.get(
 // Admin
 router.use(protect, restrictTo("admin"));
 
+router.get("/meta", hotelController.getHotelMeta);
+
 router.post(
   "/",
   validateCreateHotel,

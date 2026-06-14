@@ -86,3 +86,10 @@ export const deleteHotel = asyncHandler(async (req, res) => {
     message: "Hotel deleted successfully",
   });
 });
+export const getHotelMeta = asyncHandler(async (req, res) => {
+  const data = await hotelService.getHotelMeta();
+  successResponse(res, {
+    message: "Hotel metadata fetched successfully",
+    data,
+  });
+});

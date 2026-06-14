@@ -66,7 +66,7 @@ export const getAllHotels = async (query = {}) => {
     createdAt: -1,
   };
 
-  const filter = buildFilter(query);
+  const filter = await buildFilter(query);
 
   const [hotels, total] = await Promise.all([
     repo.findAll({
@@ -177,4 +177,19 @@ export const deleteHotel = async (id) => {
     throw new ApiError("Hotel not found", 404);
 
   await repo.softDeleteById(id);
+};
+export const getHotelMeta = async () => {
+  const [cities, regions, amenities] = await Promise.all([
+    repo.getDistinct("city", { isActive: true }),
+    repo.getDistinct("region", { isActive: true }),
+    repo.getDistinct("amenities", { isActive: true }),
+  ]);
+
+  return {
+    cities: cities.filter(Boolean).sort(),
+    regions: regions.filter(Boolean).sort(),
+    amenities: amenities.filter(Boolean).sort(),
+    roomTypes: ["single", "double", "suite", "family"],
+    currencies: ["EGP", "USD"],
+  };
 };

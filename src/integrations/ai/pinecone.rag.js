@@ -18,7 +18,7 @@ import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
 // import { getPinecone, PINECONE_INDEX } from "../../config/pinecone.js";
 import logger from "../../config/logger.js";
 
-const EMBED_MODEL = "text-embedding-3-small";
+// const EMBED_MODEL = "text-embedding-3-small";
 
 export const normalizeDocId = (id) => {
   if (id == null) return "";
@@ -38,14 +38,23 @@ export const normalizeSeedDoc = (doc) => ({
 //   });
 //   return response.data[0].embedding;
 // };
-export const embedText = async (text) => {
+// export const embedText = async (text) => {
+//   const response = await embeddingClient.embeddings.create({
+//     model: EMBED_MODEL,
+//     input: text.slice(0, 8000),
+//   });
+//   return response.data[0].embedding;
+// };
+const EMBED_MODEL = "baai/bge-m3";
+
+export const embedText = async (text, inputType = "query") => {
   const response = await embeddingClient.embeddings.create({
     model: EMBED_MODEL,
     input: text.slice(0, 8000),
+    encoding_format: "float",
   });
   return response.data[0].embedding;
 };
-
 // ─── Upsert documents into Pinecone ──────────────────────────────────────────
 // docs: Array<{ id: string, text: string, metadata: object }>
 // Called from the hotel and destination seeders.
@@ -82,77 +91,48 @@ export const upsertDocuments = async (docs) => {
     return false;
   }
 
-  const index = pc.index(PINECONE_INDEX);
-
+  const desc = await pc.describeIndex(PINECONE_INDEX);
+  const index = pc.index(PINECONE_INDEX, desc.host);
   try {
-    const records = await Promise.all(
-      docs.map(async (doc) => (
-        // console.log(doc.id)
-        // console.log(doc.id.startsWith("dest"))
-        (doc.id.startsWith("dest"))? {
-          id: doc.id || normalizeDocId(doc._id),
-          values: await embedText(doc.text),
-          metadata: {
+    // ✅ Embed in small batches to avoid rate limiting (instead of Promise.all)
+    const records = [];
+    for (const doc of docs) {
+      const values = await embedText(doc.text, "passage");
+      await new Promise((r) => setTimeout(r, 200)); // 200ms delay between embeds
+
+      const isDestination = doc.id.startsWith("dest");
+      records.push({
+        id: doc.id || normalizeDocId(doc._id),
+        values,
+        metadata: isDestination
+          ? {
             id: doc.metadata?.id || normalizeDocId(doc._id),
             city: doc.metadata?.city || "",
             category: doc.metadata?.category || "",
             region: doc.metadata?.region || "",
             slug: doc.metadata?.slug || "",
-            averageBudgetPerDay: doc.metadata?.averageBudgetPerDay ||"",
+            averageBudgetPerDay: doc.metadata?.averageBudgetPerDay || "",
             name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
             name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
-  
-            description_en:
-              doc.metadata?.description?.en || doc.metadata?.description_en || "",
-            description_ar:
-              doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+            description_en: doc.metadata?.description?.en || doc.metadata?.description_en || "",
+            description_ar: doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+            text: doc.text,
+          }
+          : {
+            id: doc.metadata?.id || normalizeDocId(doc._id),
+            city: doc.metadata?.city || "",
+            averagePricePerNight: doc.metadata?.averagePricePerNight || "",
+            stars: doc.metadata?.stars || "",
+            slug: doc.metadata?.slug || "",
+            currency: doc.metadata?.currency || "",
+            name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+            name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+            description_en: doc.metadata?.description?.en || doc.metadata?.description_en || "",
+            description_ar: doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
             text: doc.text,
           },
-        }
-        :{
-        id: doc.id || normalizeDocId(doc._id),
-        values: await embedText(doc.text),
-        metadata: {
-          id: doc.metadata?.id || normalizeDocId(doc._id),
-          city: doc.metadata?.city || "",
-          averagePricePerNight: doc.metadata?.averagePricePerNight || "",
-          stars: doc.metadata?.stars || "",
-          slug: doc.metadata?.slug || "",
-          currency: doc.metadata?.currency||"",
-          name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
-          name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
-
-          description_en:
-            doc.metadata?.description?.en || doc.metadata?.description_en || "",
-          description_ar:
-            doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
-          text: doc.text,
-        },
-      }
-
-    )
-    )
-      // docs.map(async (doc) => ({
-      //   id: doc.id || normalizeDocId(doc._id),
-      //   values: await embedText(doc.text),
-      //   metadata: {
-      //     id: doc.metadata?.id || normalizeDocId(doc._id),
-      //     city: doc.metadata?.city || "",
-      //     category: doc.metadata?.category || "",
-      //     region: doc.metadata?.region || "",
-      //     slug: doc.metadata?.slug || "",
-
-      //     name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
-      //     name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
-
-      //     description_en:
-      //       doc.metadata?.description?.en || doc.metadata?.description_en || "",
-      //     description_ar:
-      //       doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
-      //     text: doc.text,
-      //   },
-      // }))
-    );
+      });
+    }
 
     if (!records.length) {
       console.log("[RAG] No records to upsert");
@@ -161,17 +141,123 @@ export const upsertDocuments = async (docs) => {
 
     console.log(`[RAG] Upserting ${records.length} vectors to Pinecone...`);
 
-    const result = await index.upsert({
-      records,
-    });
+    // ✅ upsertRecords expects { records: [...] }
+    await index.upsert({ records });
 
-    console.log(`[RAG] Upsert successful`, result);
+    console.log(`[RAG] Upsert successful — ${records.length} vectors indexed`);
     return true;
+
   } catch (error) {
-    console.log(`[RAG] OpenAI/Pinecone unavailable — skipping upsert: ${error.message}`);
+    console.log(`[RAG] Upsert failed: ${error.message}`);
     return false;
   }
 };
+// export const upsertDocuments = async (docs) => {
+//   const pc = getPinecone();
+
+//   // TEMPORARY DEBUG — remove after fix
+//   console.log("[RAG DEBUG] getPinecone() returned:", !!pc);
+//   console.log("[RAG DEBUG] PINECONE_INDEX:", process.env.PINECONE_INDEX);
+//   console.log("[RAG DEBUG] PINECONE_API_KEY set:", !!process.env.PINECONE_API_KEY);
+//   console.log("[RAG DEBUG] docs.length:", docs?.length);
+
+//   if (!pc) {
+//     console.log("[RAG] Pinecone not configured — skipping upsert");
+//     return false;
+//   }
+
+//   const index = pc.index(PINECONE_INDEX);
+//   console.log("[RAG DEBUG] PINECONE_INDEX value used:", PINECONE_INDEX);
+//   console.log("[RAG DEBUG] index object keys:", Object.getOwnPropertyNames(Object.getPrototypeOf(index)));
+
+//   try {
+//     const records = await Promise.all(
+//       docs.map(async (doc) => (
+//         // console.log(doc.id)
+//         // console.log(doc.id.startsWith("dest"))
+//         (doc.id.startsWith("dest"))? {
+//           id: doc.id || normalizeDocId(doc._id),
+//           values: await embedText(doc.text,"passage"),
+//           metadata: {
+//             id: doc.metadata?.id || normalizeDocId(doc._id),
+//             city: doc.metadata?.city || "",
+//             category: doc.metadata?.category || "",
+//             region: doc.metadata?.region || "",
+//             slug: doc.metadata?.slug || "",
+//             averageBudgetPerDay: doc.metadata?.averageBudgetPerDay ||"",
+//             name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+//             name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+  
+//             description_en:
+//               doc.metadata?.description?.en || doc.metadata?.description_en || "",
+//             description_ar:
+//               doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+//             text: doc.text,
+//           },
+//         }
+//         :{
+//         id: doc.id || normalizeDocId(doc._id),
+//         values: await embedText(doc.text),
+//         metadata: {
+//           id: doc.metadata?.id || normalizeDocId(doc._id),
+//           city: doc.metadata?.city || "",
+//           averagePricePerNight: doc.metadata?.averagePricePerNight || "",
+//           stars: doc.metadata?.stars || "",
+//           slug: doc.metadata?.slug || "",
+//           currency: doc.metadata?.currency||"",
+//           name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+//           name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+
+//           description_en:
+//             doc.metadata?.description?.en || doc.metadata?.description_en || "",
+//           description_ar:
+//             doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+//           text: doc.text,
+//         },
+//       }
+
+//     )
+//     )
+//       // docs.map(async (doc) => ({
+//       //   id: doc.id || normalizeDocId(doc._id),
+//       //   values: await embedText(doc.text),
+//       //   metadata: {
+//       //     id: doc.metadata?.id || normalizeDocId(doc._id),
+//       //     city: doc.metadata?.city || "",
+//       //     category: doc.metadata?.category || "",
+//       //     region: doc.metadata?.region || "",
+//       //     slug: doc.metadata?.slug || "",
+
+//       //     name_en: doc.metadata?.name?.en || doc.metadata?.name_en || "",
+//       //     name_ar: doc.metadata?.name?.ar || doc.metadata?.name_ar || "",
+
+//       //     description_en:
+//       //       doc.metadata?.description?.en || doc.metadata?.description_en || "",
+//       //     description_ar:
+//       //       doc.metadata?.description?.ar || doc.metadata?.description_ar || "",
+//       //     text: doc.text,
+//       //   },
+//       // }))
+//     );
+
+//     if (!records.length) {
+//       console.log("[RAG] No records to upsert");
+//       return false;
+//     }
+
+//     console.log(`[RAG] Upserting ${records.length} vectors to Pinecone...`);
+
+//     const result = await index.upsertRecords(records);
+
+//     console.log(`[RAG] Upsert successful`, result);
+//     return true;
+//   } catch (error) {
+//     console.log(`[RAG] Full error:`, error);
+//     console.log(`[RAG] Error stack:`, error.stack);
+//     console.log(`[RAG] OpenAI/Pinecone unavailable — skipping upsert: ${error.message}`);
+//     return false;
+//   }
+// };
 
 // ─── Retrieve relevant context for a query ────────────────────────────────────
 // Returns a single context string ready to inject into a prompt,
@@ -207,21 +293,21 @@ export const upsertDocuments = async (docs) => {
 //   }
 // };
 export const retrieveContext = async (query, topK = 5) => {
-  const MIN_SCORE = 0.45; // ⬅️ move here (safe)
-
+  const MIN_SCORE = 0.45;
   const pc = getPinecone();
   if (!pc) return null;
 
   try {
-    const index = pc.index(PINECONE_INDEX);
+    const desc = await pc.describeIndex(PINECONE_INDEX);
+    const index = pc.index(PINECONE_INDEX, desc.host);
     const queryVector = await embedText(query);
+
 
     const result = await index.query({
       vector: queryVector,
       topK,
       includeMetadata: true,
     });
-
     if (!result.matches?.length) return null;
 
     const chunks = result.matches
@@ -229,14 +315,49 @@ export const retrieveContext = async (query, topK = 5) => {
       .map((m) => m.metadata?.text || "")
       .filter(Boolean);
 
-    if (!chunks.length) return null;
+    return chunks.length ? chunks.join("\n\n---\n\n") : null;
 
-    return chunks.join("\n\n---\n\n");
   } catch (err) {
+    // ✅ 404 = index not ready yet, not a crash-worthy error
+    if (err.message?.includes("404") || err.status === 404) {
+      logger.warn(`[RAG] Pinecone index not ready yet — skipping RAG`);
+      return null;
+    }
     logger.error(`[RAG] Pinecone query failed: ${err.message}`);
     return null;
   }
 };
+// export const retrieveContext = async (query, topK = 5) => {
+//   const MIN_SCORE = 0.45; // ⬅️ move here (safe)
+
+//   const pc = getPinecone();
+//   if (!pc) return null;
+
+//   try {
+//     const index = pc.index(PINECONE_INDEX);
+//     const queryVector = await embedText(query);
+
+//     const result = await index.query({
+//       vector: queryVector,
+//       topK,
+//       includeMetadata: true,
+//     });
+
+//     if (!result.matches?.length) return null;
+
+//     const chunks = result.matches
+//       .filter((m) => m.score >= MIN_SCORE)
+//       .map((m) => m.metadata?.text || "")
+//       .filter(Boolean);
+
+//     if (!chunks.length) return null;
+
+//     return chunks.join("\n\n---\n\n");
+//   } catch (err) {
+//     logger.error(`[RAG] Pinecone query failed: ${err.message}`);
+//     return null;
+//   }
+// };
 // ─── Build plain-text document for indexing ──────────────────────────────────
 // Converts a hotel or destination document into a searchable text blob.
 export const buildHotelIndexDoc = (doc) => {
