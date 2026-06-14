@@ -116,14 +116,30 @@ export const adminGetAllBookings = async (query) => {
 };
 
 // ─── Admin: update booking status ─────────────────────────────────────────────
-export const adminUpdateStatus = async (bookingId, status) => {
-  const VALID = ["pending", "confirmed", "canceled", "completed"];
-  if (!VALID.includes(status))
-    throw new ApiError(`status must be one of: ${VALID.join(", ")}`, 400);
+export const adminUpdateStatus = async (bookingId, { status, paymentStatus }) => {
+  const VALID_STATUS = ["pending", "confirmed", "canceled", "completed"];
+  const VALID_PAYMENT = ["pending", "processing", "succeeded", "failed", "refunded"];
+
+  const update = {};
+
+  if (status) {
+    if (!VALID_STATUS.includes(status))
+      throw new ApiError(`status must be one of: ${VALID_STATUS.join(", ")}`, 400);
+    update.status = status;
+  }
+
+  if (paymentStatus) {
+    if (!VALID_PAYMENT.includes(paymentStatus))
+      throw new ApiError(`paymentStatus must be one of: ${VALID_PAYMENT.join(", ")}`, 400);
+    update.paymentStatus = paymentStatus;
+  }
+
+  if (!Object.keys(update).length)
+    throw new ApiError("Provide status or paymentStatus", 400);
 
   const booking = await BookingModel.findByIdAndUpdate(
     bookingId,
-    { status },
+    update,
     { new: true, runValidators: true }
   );
   if (!booking) throw new ApiError("Booking not found", 404);

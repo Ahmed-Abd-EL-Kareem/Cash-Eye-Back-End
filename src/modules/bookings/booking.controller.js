@@ -28,6 +28,6 @@ export const adminGetAllBookings = asyncHandler(async (req, res) => {
 });
 
 export const adminUpdateStatus = asyncHandler(async (req, res) => {
-  const booking = await bookingService.adminUpdateStatus(req.params.id, req.body.status);
+const booking = await bookingService.adminUpdateStatus(req.params.id, req.body);
   successResponse(res, { message: "Booking status updated", data: booking });
 });
