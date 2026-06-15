@@ -2,6 +2,9 @@ import "./src/config/env.js";
 import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
 import { seedPlans } from "./src/modules/subscriptions/plan/plan.service.js";
+import dns from "node:dns"
+
+dns.setServers(["8.8.8.8", "8.8.4.4"])
 
 const port = process.env.PORT || 3000;
 

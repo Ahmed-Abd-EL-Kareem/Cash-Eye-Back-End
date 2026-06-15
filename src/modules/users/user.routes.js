@@ -9,7 +9,7 @@ router
   .route("/")
   .get(protect, UserController.getUsers)
   .post(protect, restrictTo("admin"), UserController.createUsers);
-
+  router.patch("/change-password", protect, UserController.changePassword);
 router
   .route("/:id")
   .get(protect, UserController.getUser)
