@@ -154,7 +154,10 @@ export const updateDestination = async (id, data) => {
 export const deleteDestination = async (id) => {
   const dest = await repo.findById(id);
   if (!dest) throw new ApiError("Destination not found", 404);
-  await repo.softDeleteById(id);
+  // await repo.softDeleteById(id);
+
+return repo.updateById(id, { isActive: !dest.isActive });
+
 };
 
 // ─── Internal: get destinations by city ──────────────────────────────────────
