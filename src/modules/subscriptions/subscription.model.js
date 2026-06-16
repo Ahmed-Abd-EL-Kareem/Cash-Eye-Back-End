@@ -15,12 +15,12 @@ const subscriptionSchema = new mongoose.Schema(
     },
     planName: {
       type: String,
-      enum: ["free", "pro"],
+      enum: ["free", "premium", "pro"],
       required: true,
     },
     status: {
       type: String,
-      enum: ["active", "canceled", "free", "past_due"],
+      enum: ["active", "canceled", "free", "past_due", "trial", "expired"],
       default: "free",
     },
     startDate: { type: Date, default: Date.now },
@@ -34,7 +34,7 @@ const subscriptionSchema = new mongoose.Schema(
     usage: {
       tokensUsedThisMonth: { type: Number, default: 0 },
       requestsToday: { type: Number, default: 0 },
-      tripsThisMonth: { type: Number, default: 0 }, // ← trip generation quota
+      tripsThisMonth: { type: Number, default: 0 },
       lastRequestDate: { type: Date, default: null },
       lastResetDate: { type: Date, default: Date.now },
     },
@@ -51,7 +51,7 @@ const subscriptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ─── Reset daily request counter ─────────────────────────────────────────────
+// ─── Reset daily request counter ──────────────────────────────────────────────
 subscriptionSchema.methods.checkAndResetDaily = function () {
   const today = new Date().toDateString();
   const lastRequest = this.usage.lastRequestDate
@@ -64,7 +64,7 @@ subscriptionSchema.methods.checkAndResetDaily = function () {
   }
 };
 
-// ─── Reset monthly token + trip counters ─────────────────────────────────────
+// ─── Reset monthly token + trip counters ──────────────────────────────────────
 subscriptionSchema.methods.checkAndResetMonthly = function () {
   const now = new Date();
   const lastReset = this.usage.lastResetDate;
@@ -79,7 +79,6 @@ subscriptionSchema.methods.checkAndResetMonthly = function () {
 };
 
 // ─── Reset monthly trip counter ───────────────────────────────────────────────
-// Separate from checkAndResetMonthly so the middleware can call it independently
 subscriptionSchema.methods.checkAndResetTrips = function () {
   const now = new Date();
   const lastReset = this.usage.lastResetDate;

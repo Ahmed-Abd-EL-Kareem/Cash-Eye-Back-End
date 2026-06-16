@@ -55,8 +55,32 @@ export const changePlan = async (userId, newPlanName) => {
   subscription.planName = newPlanName;
   subscription.status = newPlanName === "free" ? "free" : "active";
   subscription.startDate = new Date();
+  subscription.endDate =
+    newPlanName === "free"
+      ? null
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await UserModel.findByIdAndUpdate(userId, { subscription: subscription._id });
+  await subscription.save();
+  return subscription;
+};
+
+// ─── Cancel Subscription (user self-service) ──────────────────────────────────
+
+export const cancelSubscription = async (userId) => {
+  const subscription = await SubscriptionModel.findOne({ user: userId });
+  if (!subscription) throw new AppError("Subscription not found", 404);
+  if (subscription.status === "canceled")
+    throw new AppError("Subscription already canceled", 400);
+
+  subscription.history.push({
+    fromPlan: subscription.planName,
+    toPlan: subscription.planName,
+    reason: "cancellation",
+  });
+
+  subscription.status = "canceled";
+  subscription.canceledAt = new Date();
   await subscription.save();
   return subscription;
 };
@@ -107,11 +131,11 @@ export const checkAndConsumeTokens = async (userId, tokensToUse) => {
 export const getAllSubscriptions = async (query = {}) => {
   const baseQuery = SubscriptionModel.find()
     .populate("user", "name email")
-    .populate("plan", "name displayName price");
+    .populate("plan", "name displayName price limits");
 
   const features = new APIFeatures(SubscriptionModel, baseQuery, query)
     .filter()
-    .search([])   // subscriptions have no text fields worth searching — extend if needed
+    .search([])
     .sort()
     .paginate();
 
@@ -129,6 +153,52 @@ export const getAllSubscriptions = async (query = {}) => {
       limit: features.limit,
       pages: Math.ceil(total / features.limit),
     },
+  };
+};
+
+// ─── Admin: Get Expiring Subscriptions ────────────────────────────────────────
+
+export const getExpiringSubscriptions = async (days = 7) => {
+  const future = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  return await SubscriptionModel.find({
+    status: "active",
+    endDate: { $lte: future, $gte: new Date() },
+  })
+    .populate("user", "name email")
+    .populate("plan", "name displayName");
+};
+
+// ─── Admin: Expire Past-Due Subscriptions (Cron Job) ──────────────────────────
+
+export const expireSubscriptions = async () => {
+  const result = await SubscriptionModel.updateMany(
+    { status: "active", endDate: { $lt: new Date() } },
+    { status: "past_due" }
+  );
+  return result.modifiedCount;
+};
+
+// ─── Admin: Get Churn Stats ────────────────────────────────────────────────────
+
+export const getChurnStats = async () => {
+  const [total, canceled, past_due, active, free] = await Promise.all([
+    SubscriptionModel.countDocuments(),
+    SubscriptionModel.countDocuments({ status: "canceled" }),
+    SubscriptionModel.countDocuments({ status: "past_due" }),
+    SubscriptionModel.countDocuments({ status: "active" }),
+    SubscriptionModel.countDocuments({ status: "free" }),
+  ]);
+
+  return {
+    total,
+    active,
+    free,
+    canceled,
+    past_due,
+    churnRate:
+      total > 0
+        ? (((canceled + past_due) / total) * 100).toFixed(2)
+        : "0.00",
   };
 };
 
@@ -152,8 +222,78 @@ export const adminChangePlan = async (userId, newPlanName) => {
   subscription.plan = plan._id;
   subscription.planName = newPlanName;
   subscription.status = newPlanName === "free" ? "free" : "active";
+  subscription.endDate =
+    newPlanName === "free"
+      ? null
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await UserModel.findByIdAndUpdate(userId, { subscription: subscription._id });
   await subscription.save();
   return subscription;
+};
+
+// ─── Admin: Cancel Any User's Subscription ────────────────────────────────────
+
+export const adminCancelSubscription = async (userId) => {
+  const subscription = await SubscriptionModel.findOne({ user: userId });
+  if (!subscription) throw new AppError("Subscription not found", 404);
+  if (subscription.status === "canceled")
+    throw new AppError("Subscription already canceled", 400);
+
+  subscription.history.push({
+    fromPlan: subscription.planName,
+    toPlan: subscription.planName,
+    reason: "admin_cancellation",
+  });
+
+  subscription.status = "canceled";
+  subscription.canceledAt = new Date();
+  await subscription.save();
+  return subscription;
+};
+
+// ─── Admin: Create Subscription for Existing User ─────────────────────────────
+
+export const adminCreateSubscription = async (userId, planName) => {
+  const [plan, user] = await Promise.all([
+    PlanModel.findOne({ name: planName, isActive: true }),
+    UserModel.findById(userId),
+  ]);
+
+  if (!plan) throw new AppError("Plan not found or inactive", 404);
+  if (!user) throw new AppError("User not found", 404);
+
+  const existing = await SubscriptionModel.findOne({ user: userId });
+  if (existing) {
+    existing.history.push({
+      fromPlan: existing.planName,
+      toPlan: planName,
+      reason: "admin_create",
+    });
+    existing.plan = plan._id;
+    existing.planName = planName;
+    existing.status = planName === "free" ? "free" : "active";
+    existing.startDate = new Date();
+    existing.endDate =
+      planName === "free"
+        ? null
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await existing.save();
+    return existing;
+  }
+
+  const sub = await SubscriptionModel.create({
+    user: userId,
+    plan: plan._id,
+    planName,
+    status: planName === "free" ? "free" : "active",
+    startDate: new Date(),
+    endDate:
+      planName === "free"
+        ? null
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+
+  await UserModel.findByIdAndUpdate(userId, { subscription: sub._id });
+  return sub;
 };
