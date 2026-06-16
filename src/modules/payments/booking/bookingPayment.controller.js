@@ -59,3 +59,30 @@ export const getPaymentStatus = asyncHandler(async (req, res) => {
     data: result,
   });
 });
+// =====================update===(Cancelled Bookings/Average Booking Price/Revenue)
+export const getRevenueStats = asyncHandler(async (req, res) => {
+  const data = await bookingPaymentService.getRevenueStats();
+
+  successResponse(res, {
+    message: "Revenue stats fetched successfully",
+    data,
+  });
+});
+
+export const getAverageBookingPrice = asyncHandler(async (req, res) => {
+  const data = await bookingPaymentService.getAverageBookingPrice();
+
+  successResponse(res, {
+    message: "Average booking price fetched successfully",
+    data,
+  });
+});
+
+export const getCancelledBookingsCount = asyncHandler(async (req, res) => {
+  const data = await bookingPaymentService.getCancelledBookingsCount();
+
+  successResponse(res, {
+    message: "Cancelled bookings fetched successfully",
+    data,
+  });
+});

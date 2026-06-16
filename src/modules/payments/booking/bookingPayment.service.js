@@ -3,6 +3,8 @@ import BookingModel from "../../bookings/booking.model.js";
 import UserModel from "../../users/user.model.js";
 import ApiError from "../../../utils/apiError.js";
 import logger from "../../../config/logger.js";
+// update==================
+import SubscriptionModel from "../../subscriptions/subscription.model.js";
 
 const getPaymentIntentId = (session) => {
   const pi = session.payment_intent;
@@ -286,5 +288,58 @@ export const getPaymentStatus = async (bookingId, userId) => {
     paidAt: booking.paidAt,
     failureReason: booking.failureReason || null,
     bookingStatus: booking.status,
+  };
+};
+// Revenue====================
+export const getRevenueStats = async () => {
+  const bookings = await BookingModel.find();
+
+  let totalBookingRevenue = 0;
+
+  bookings.forEach((booking) => {
+    totalBookingRevenue += booking.totalPrice || 0;
+  });
+
+  const proSubscriptionsCount = await SubscriptionModel.countDocuments({
+    planName: "pro",
+  });
+
+  const proSubscriptionsRevenue = proSubscriptionsCount * 20;
+
+  return {
+    totalBookingRevenue,
+    proSubscriptionsRevenue,
+    totalRevenue:
+      totalBookingRevenue + proSubscriptionsRevenue,
+  };
+};
+// =====================Average Booking Price======
+export const getAverageBookingPrice = async () => {
+  const bookings = await BookingModel.find();
+
+  if (!bookings.length) {
+    return {
+      averageBookingPrice: 0,
+    };
+  }
+
+  let total = 0;
+
+  bookings.forEach((booking) => {
+    total += booking.totalPrice || 0;
+  });
+
+  return {
+    averageBookingPrice: total / bookings.length,
+  };
+};
+// =====================Cancelled Bookings=====
+export const getCancelledBookingsCount = async () => {
+  const cancelledBookings = await BookingModel.countDocuments({
+    status: "canceled",
+  });
+
+  return {
+    cancelledBookings,
   };
 };
