@@ -28,6 +28,11 @@ const tripSchema = new mongoose.Schema(
     // AI-generated or manually saved
     title: { type: String, required: true, trim: true },
     destination: { type: String, required: true, trim: true },
+    imageUrl: {
+  type: String,
+  default: null,
+  trim: true,
+},
     duration: { type: Number, required: true, min: 1 },
 
     budget: {

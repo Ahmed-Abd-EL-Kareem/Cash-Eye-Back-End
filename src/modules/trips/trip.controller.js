@@ -4,29 +4,48 @@ import * as tripService from "./trip.service.js";
 import { successResponse, createdResponse } from "../../utils/apiResponse.js";
 import { recordAIUsage } from "../../middleware/aiUsage.middleware.js";
 
+
 // POST /api/v1/trips/generate
 export const generateTrip = asyncHandler(async (req, res) => {
-  const { destination, duration, budget, travelers, interests, language } = req.body;
+  const {
+    destination,
+    duration,
+    budget,
+    travelers,
+    interests,
+    language,
+    imageUrl,
+  } = req.body;
 
   if (!destination?.trim())
     throw new ApiError("destination is required", 400);
+
   if (!duration || isNaN(Number(duration)) || Number(duration) < 1)
     throw new ApiError("duration must be a positive number (days)", 400);
 
-  const result = await tripService.generateAndSaveTrip(req.user._id, {
-    destination: destination.trim(),
-    duration: Number(duration),
-    budget,
-    travelers: travelers ? Number(travelers) : 1,
-    interests,
-    language,
+  const result = await tripService.generateAndSaveTrip(
+    req.user._id,
+    {
+      destination: destination.trim(),
+      duration: Number(duration),
+      budget,
+      travelers: travelers ? Number(travelers) : 1,
+      interests,
+      language,
+      imageUrl,
+    }
+  );
+
+  await recordAIUsage(req.subscription, {
+    isTripGeneration: true,
   });
-  await recordAIUsage(req.subscription, { isTripGeneration: true });
 
   createdResponse(res, {
     message: "Trip generated successfully",
     tokensUsed: result.tokensUsed,
-    data: { trip: result.trip },
+    data: {
+      trip: result.trip,
+    },
   });
 });
 
@@ -69,5 +88,71 @@ export const adminGetAllTrips = asyncHandler(async (req, res) => {
     length: result.trips.length,
     data: result.trips,
     meta: { pagination: result.pagination },
+  });
+});
+// POST /api/v1/trips
+export const createManualTrip = asyncHandler(async (req, res) => {
+  const {
+    title,
+    destination,
+    duration,
+    budget,
+    travelers,
+    interests,
+    language,
+    imageUrl,
+    summary,
+    days,
+    estimatedTotalCost,
+    currency,
+    status,
+  } = req.body;
+
+  if (!title?.trim())
+    throw new ApiError("title is required", 400);
+  if (!destination?.trim())
+    throw new ApiError("destination is required", 400);
+  if (!duration || isNaN(Number(duration)) || Number(duration) < 1)
+    throw new ApiError("duration must be a positive number (days)", 400);
+
+  const trip = await tripService.createManualTrip(req.user._id, {
+    title: title.trim(),
+    destination: destination.trim(),
+    duration: Number(duration),
+    budget,
+    travelers: travelers ? Number(travelers) : 1,
+    interests,
+    language,
+    imageUrl,
+    summary,
+    days,
+    estimatedTotalCost,
+    currency,
+    status,
+  });
+
+  createdResponse(res, {
+    message: "Trip created successfully",
+    data: { trip },
+  });
+});
+export const adminGetTripById = asyncHandler(async (req, res) => {
+  const trip = await tripService.adminGetTripById(req.params.id);
+
+  successResponse(res, {
+    message: "Trip fetched successfully",
+    data: trip,
+  });
+});
+
+export const adminUpdateTrip = asyncHandler(async (req, res) => {
+  const trip = await tripService.adminUpdateTrip(
+    req.params.id,
+    req.body
+  );
+
+  successResponse(res, {
+    message: "Trip updated successfully",
+    data: trip,
   });
 });

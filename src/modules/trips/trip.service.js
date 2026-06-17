@@ -3,42 +3,87 @@ import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
 import { generateTripPlan } from "../../integrations/ai/tripPlanner.ai.js";
+import { createUsage } from "../aiUsage/aiUsage.service.js";
 
 // ─── Generate + save AI trip ──────────────────────────────────────────────────
 export const generateAndSaveTrip = async (userId, params) => {
-  const { destination, duration, budget, travelers, interests, language } = params;
-
-  const aiResult = await generateTripPlan({
+  const {
     destination,
     duration,
-    budget: budget || "mid-range",
-    travelers: travelers || 1,
-    interests: interests || [],
-    language: language || "en",
-  });
+    budget,
+    travelers,
+    interests,
+    language,
+    imageUrl,
+  } = params;
 
-  const trip = await TripModel.create({
-    user: userId,
-    title: aiResult.title,
-    destination,
-    duration,
-    budget: budget || "mid-range",
-    travelers: travelers || 1,
-    interests: interests || [],
-    language: language || "en",
-    days: aiResult.days,
-    summary: aiResult.summary,
-    estimatedTotalCost: aiResult.estimatedTotalCost || 0,
-    currency: aiResult.currency || "EGP",
-    status: "draft",
-    isAIGenerated: true,
-  });
+  const start = Date.now();
 
-  await UserModel.findByIdAndUpdate(userId, {
-    $addToSet: { savedTrips: trip._id },
-  });
+  try {
+    const aiResult = await generateTripPlan({
+      destination,
+      duration,
+      budget: budget || "mid-range",
+      travelers: travelers || 1,
+      interests: interests || [],
+      language: language || "en",
+    });
 
-  return { trip, tokensUsed: aiResult.tokensUsed };
+    const trip = await TripModel.create({
+      user: userId,
+      title: aiResult.title,
+      destination,
+      imageUrl,
+      duration,
+      budget: budget || "mid-range",
+      travelers: travelers || 1,
+      interests: interests || [],
+      language: language || "en",
+      days: aiResult.days,
+      summary: aiResult.summary,
+      estimatedTotalCost: aiResult.estimatedTotalCost || 0,
+      currency: aiResult.currency || "EGP",
+      status: "draft",
+      isAIGenerated: true,
+    });
+
+    await UserModel.findByIdAndUpdate(userId, {
+      $addToSet: { savedTrips: trip._id },
+    });
+
+    const responseTime = Date.now() - start;
+
+    // Log success AI Usage
+    await createUsage({
+      user: userId,
+      trip: trip._id,
+      model: aiResult.rawResponse?.model || "openai/gpt-oss-120b",
+      promptTokens: aiResult.rawResponse?.usage?.prompt_tokens || 0,
+      completionTokens: aiResult.rawResponse?.usage?.completion_tokens || 0,
+      totalTokens: aiResult.rawResponse?.usage?.total_tokens || 0,
+      responseTime,
+      success: true,
+    });
+
+    return { trip, tokensUsed: aiResult.tokensUsed };
+  } catch (error) {
+    const responseTime = Date.now() - start;
+
+    // Log failure AI Usage
+    await createUsage({
+      user: userId,
+      trip: null,
+      model: "openai/gpt-oss-120b", // default fallback model
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      responseTime,
+      success: false,
+      errorMessage: error.message || "Failed to generate AI trip plan",
+    });
+
+    throw error;
+  }
 };
 
 // ─── Get my trips ─────────────────────────────────────────────────────────────
@@ -64,6 +109,50 @@ export const getMyTrips = async (userId, query) => {
     },
   };
 };
+////
+// ─── Create manual trip ───────────────────────────────────────────────────────
+export const createManualTrip = async (userId, params) => {
+  const {
+    title,
+    destination,
+    duration,
+    budget,
+    travelers,
+    interests,
+    language,
+    imageUrl,
+    summary,
+    days,
+    estimatedTotalCost,
+    currency,
+    status,
+  } = params;
+
+  const trip = await TripModel.create({
+    user: userId,
+    title,
+    destination,
+    imageUrl: imageUrl || null,
+    duration,
+    budget: budget || "mid-range",
+    travelers: travelers || 1,
+    interests: interests || [],
+    language: language || "en",
+    days: days || [],
+    summary: summary || null,
+    estimatedTotalCost: estimatedTotalCost || 0,
+    currency: currency || "EGP",
+    status: status || "draft",
+    isAIGenerated: false,
+  });
+
+  await UserModel.findByIdAndUpdate(userId, {
+    $addToSet: { savedTrips: trip._id },
+  });
+
+  return trip;
+};
+///////////////
 
 // ─── Get single (owner only) ──────────────────────────────────────────────────
 export const getTripById = async (tripId, userId) => {
@@ -74,7 +163,20 @@ export const getTripById = async (tripId, userId) => {
 
 // ─── Update trip ──────────────────────────────────────────────────────────────
 export const updateTrip = async (tripId, userId, updates) => {
-  const ALLOWED = ["title", "status", "days", "summary", "interests"];
+const ALLOWED = [
+ "title",
+  "destination",
+  "duration",
+  "budget",
+  "estimatedTotalCost",
+  "travelers",
+  "language",
+  "status",
+  "days",
+  "summary",
+  "interests",
+  "imageUrl",
+];
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
@@ -117,4 +219,47 @@ export const adminGetAllTrips = async (query) => {
       totalPages: Math.ceil(total / features.limit),
     },
   };
+    
+};
+export const adminGetTripById = async (tripId) => {
+  const trip = await TripModel.findById(tripId)
+    .populate("user", "name email");
+
+  if (!trip) throw new ApiError("Trip not found", 404);
+
+  return trip;
+};
+
+export const adminUpdateTrip = async (tripId, updates) => {
+  const ALLOWED = [
+    "title",
+    "destination",
+    "duration",
+    "budget",
+    "estimatedTotalCost",
+    "travelers",
+    "language",
+    "status",
+    "days",
+    "summary",
+    "interests",
+    "imageUrl",
+  ];
+
+  const filtered = Object.fromEntries(
+    Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
+  );
+
+  const trip = await TripModel.findByIdAndUpdate(
+    tripId,
+    filtered,
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!trip) throw new ApiError("Trip not found", 404);
+
+  return trip;
 };

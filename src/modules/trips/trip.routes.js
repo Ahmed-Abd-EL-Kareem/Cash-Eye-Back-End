@@ -10,6 +10,17 @@ router.use(protect);
 
 // String routes BEFORE /:id
 router.get("/admin/all", restrictTo("admin"), tripController.adminGetAllTrips);
+router.get(
+  "/admin/:id",
+  restrictTo("admin"),
+  tripController.adminGetTripById
+);
+
+router.patch(
+  "/admin/:id",
+  restrictTo("admin"),
+  tripController.adminUpdateTrip
+);
 router.post("/generate", checkAIQuota(true), tripController.generateTrip);
 // router.post("/generate", tripController.generateTrip);
 
@@ -17,5 +28,8 @@ router.get("/", tripController.getMyTrips);
 router.get("/:id", tripController.getTripById);
 router.patch("/:id", tripController.updateTrip);
 router.delete("/:id", tripController.deleteTrip);
+// POST /api/v1/trips  ← add this line (no AI quota check needed)
+router.post("/", tripController.createManualTrip);
+
 
 export default router;

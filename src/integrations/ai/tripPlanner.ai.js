@@ -82,5 +82,5 @@ export const generateTripPlan = async ({
     `[TripPlanner] Generated "${parsed.title}" for ${destination} — ${tokensUsed} tokens`
   );
 
-  return { ...parsed, tokensUsed };
+  return { ...parsed, tokensUsed, rawResponse: response };
 };
