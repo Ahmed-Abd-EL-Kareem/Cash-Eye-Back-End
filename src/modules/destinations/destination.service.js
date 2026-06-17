@@ -1,19 +1,8 @@
 import * as repo from "./destination.repository.js";
 import ApiError from "../../utils/apiError.js";
-import { indexDestination } from "../../integrations/ai/pinecone.rag.js";
+import { indexDestination } from "../../integrations/langchain/rag.retriever.js";
 import logger from "../../config/logger.js";
 
-// ─── Build MongoDB filter from query params ───────────────────────────────────
-// Supported params:
-//   ?city=Cairo          — case-insensitive city filter
-//   ?category=historical — exact category match
-//   ?region=Upper Egypt  — exact region match
-//   ?month=October       — destinations best visited that month
-//   ?minBudget=500       — minimum average budget per day (EGP)
-//   ?maxBudget=2000      — maximum average budget per day (EGP)
-//   ?search=pyramid      — full-text search (uses MongoDB text index)
-//   ?sort=-createdAt     — sort field (see sortMap below)
-//   ?page=1&limit=10     — pagination
 const buildFilter = ({
   city,
   category,
@@ -36,13 +25,11 @@ const buildFilter = ({
     if (maxBudget !== undefined) filter.averageBudgetPerDay.$lte = Number(maxBudget);
   }
 
-  // Full-text search uses the compound text index on name.en + name.ar + description
   if (search) filter.$text = { $search: search };
 
   return filter;
 };
 
-// ─── Get all (paginated + filtered) ──────────────────────────────────────────
 export const getAllDestinations = async (query = {}) => {
   const page = Math.max(1, parseInt(query.page) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(query.limit) || 10));
@@ -57,7 +44,6 @@ export const getAllDestinations = async (query = {}) => {
     "-name": { "name.en": -1 },
   };
   const sort = sortMap[query.sort] || { createdAt: -1 };
-
   const filter = buildFilter(query);
 
   const [destinations, total] = await Promise.all([
@@ -71,48 +57,28 @@ export const getAllDestinations = async (query = {}) => {
   };
 };
 
-// ─── Get single by ID ─────────────────────────────────────────────────────────
 export const getDestinationById = async (id) => {
   const dest = await repo.findById(id);
   if (!dest || !dest.isActive) throw new ApiError("Destination not found", 404);
   return dest;
 };
 
-// ─── Get single by slug ───────────────────────────────────────────────────────
 export const getDestinationBySlug = async (slug) => {
   const dest = await repo.findBySlug(slug);
   if (!dest || !dest.isActive) throw new ApiError("Destination not found", 404);
   return dest;
 };
 
-// ─── Geo search: destinations near a point ────────────────────────────────────
-// Uses the 2dsphere index + $near for spherical distance (accurate on Earth).
-// Example: GET /destinations/nearby?lng=31.13&lat=29.97&maxKm=50
-//
-// WHY $near instead of $geoWithin?
-//   $near returns results sorted by distance (closest first).
-//   $geoWithin returns results in arbitrary order.
-//   For a "show me what's nearby" UX, sorted results are always better.
-export const getDestinationsNearby = async ({
-  lng,
-  lat,
-  maxKm = 100,
-  limit = 10,
-}) => {
+export const getDestinationsNearby = async ({ lng, lat, maxKm = 100, limit = 10 }) => {
   if (!lng || !lat) throw new ApiError("lng and lat query params are required", 400);
-
-  const maxMeters = Number(maxKm) * 1000;
-
   return repo.findNear({
-    coordinates: [Number(lng), Number(lat)],  // GeoJSON order: [lng, lat]
-    maxMeters,
+    coordinates: [Number(lng), Number(lat)],
+    maxMeters: Number(maxKm) * 1000,
     limit: Math.min(50, Number(limit)),
   });
 };
 
-// ─── Create ───────────────────────────────────────────────────────────────────
 export const createDestination = async (data) => {
-  // Auto-generate slug from English name if not provided
   if (!data.slug && data.name?.en) {
     data.slug = data.name.en
       .toLowerCase()
@@ -126,17 +92,16 @@ export const createDestination = async (data) => {
 
   const destination = await repo.create(data);
 
-  try {
-    await indexDestination(destination);
+  // Index into Pinecone via rag.retriever.js (non-blocking — never crash the request)
+  indexDestination(destination).then(() => {
     logger.info(`[RAG] Indexed destination ${destination._id} in Pinecone`);
-  } catch (err) {
+  }).catch((err) => {
     logger.warn(`[RAG] Failed to index destination ${destination._id}: ${err.message}`);
-  }
+  });
 
   return destination;
 };
 
-// ─── Update ───────────────────────────────────────────────────────────────────
 export const updateDestination = async (id, data) => {
   const dest = await repo.findById(id);
   if (!dest) throw new ApiError("Destination not found", 404);
@@ -149,17 +114,12 @@ export const updateDestination = async (id, data) => {
   return repo.updateById(id, data);
 };
 
-// ─── Soft delete ──────────────────────────────────────────────────────────────
-// isActive: false hides the destination from public API while preserving the
-// Pinecone vector — AI trip plans that reference it still work.
 export const deleteDestination = async (id) => {
   const dest = await repo.findById(id);
   if (!dest) throw new ApiError("Destination not found", 404);
   await repo.softDeleteById(id);
 };
 
-// ─── Internal: get destinations by city ──────────────────────────────────────
-// Used by the AI trip planner to inject destination context into prompts.
 export const getDestinationsByCity = async (city, limit = 5) => {
   return repo.findAll({
     filter: { city: { $regex: new RegExp(city, "i") }, isActive: true },

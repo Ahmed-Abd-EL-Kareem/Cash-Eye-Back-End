@@ -9,11 +9,12 @@ router
   .route("/")
   .get(protect, UserController.getUsers)
   .post(protect, restrictTo("admin"), UserController.createUsers);
-
-router
+  
+  router
   .route("/:id")
   .get(protect, UserController.getUser)
   .patch(protect, UserController.updateUser)
   .delete(protect, UserController.deleteUser);
-
+  
+  router.patch("/change-password", protect, UserController.changePassword);
 export default router;
