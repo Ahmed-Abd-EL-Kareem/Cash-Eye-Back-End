@@ -16,5 +16,4 @@ router
   .patch(protect, UserController.updateUser)
   .delete(protect, UserController.deleteUser);
   
-  router.patch("/change-password", protect, UserController.changePassword);
 export default router;
