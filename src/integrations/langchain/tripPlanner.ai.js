@@ -146,7 +146,7 @@ async function plannerNode(state) {
   const tokensUsed = (response.usage_metadata?.total_tokens || 0) + state.tokensUsed;
   logger.info(`[TripPlanner] LLM done — ${tokensUsed} total tokens`);
 
-  return { rawOutput: response.content, tokensUsed };
+  return { rawOutput: response.content, tokensUsed, rawResponse: response  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

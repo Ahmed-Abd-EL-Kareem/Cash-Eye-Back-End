@@ -39,6 +39,32 @@ import {
 import { BOOKING_SYSTEM } from "./agent.prompts.js";
 import logger from "../../config/logger.js";
 
+// ─── Required fields for a valid booking ─────────────────────────────────────
+const REQUIRED_BOOKING_FIELDS = [
+  "destination",
+  "checkIn",
+  "checkOut",
+  "guests",
+  "rooms",
+  "selectedHotelId",
+  "paymentMethod",
+];
+
+// Returns list of missing field names, empty array if all present
+const getMissingFields = (context) =>
+  REQUIRED_BOOKING_FIELDS.filter(
+    (f) => context[f] === undefined || context[f] === null || context[f] === ""
+  );
+
+// Validate date string is a real future-ish date (not a hallucination like 2024-03-15)
+const isValidBookingDate = (dateStr) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return false;
+  // Reject dates before 2025 — clearly hallucinated
+  return d.getFullYear() >= 2025;
+};
+
 // ─── In-memory session store (swap for Redis in production) ──────────────────
 const bookingSessions = new Map();
 
@@ -115,7 +141,7 @@ const bookingToolNode = new ToolNode(bookingTools);
 const bookingLLMWithTools = bookingLLM.bindTools(bookingTools);
 
 async function bookingAgentNode(state) {
-  logger.info(`[Booking Agent] Step: "${state.session.step}" — "${state.userMessage}"`);
+  logger.info(`[Booking Agent] Step: "${state.session.step}" — "${state.userMessage.slice(0, 60)}"`);
 
   const session = state.session;
 
@@ -152,22 +178,31 @@ async function bookingAgentNode(state) {
   let tokensUsed = 0;
   let bookingId = null;
 
+  // ── Guard: prevent duplicate save if booking already confirmed ───────────────
+  if (session.context.savedBookingId) {
+    logger.info(`[Booking] Already confirmed: ${session.context.savedBookingId} — skipping agent loop`);
+    return {
+      _rawReply: `Your booking is already confirmed! 🎉 Booking ID: ${session.context.savedBookingId}. Is there anything else I can help you with?`,
+      _tokens: 0,
+      _bookingId: session.context.savedBookingId,
+      session,
+    };
+  }
+
   // Agentic loop — max 8 iterations
   for (let i = 0; i < 8; i++) {
     const response = await bookingLLMWithTools.invoke(messages);
     messages.push(response);
     tokensUsed += response.usage_metadata?.total_tokens || 0;
 
-    // No tool calls → this IS the final human-readable reply
+    // No tool calls → final human-readable reply
     if (!response.tool_calls?.length) {
-      // Guard: if the content looks like raw JSON, force one more iteration
       const raw = (response.content || "").trim();
-      const looksLikeJson = raw.startsWith("{") || raw.startsWith("[");
-      if (looksLikeJson) {
-        // Inject a correction message and loop again
+      // Guard: if content looks like raw JSON, force LLM to rephrase
+      if (raw.startsWith("{") || raw.startsWith("[")) {
         messages.push({
           role: "user",
-          content: "Please summarise those results in a friendly, human-readable message. Do not output raw JSON.",
+          content: "Please summarise that in a friendly, human-readable message. Do not output raw JSON.",
         });
         continue;
       }
@@ -175,20 +210,54 @@ async function bookingAgentNode(state) {
       break;
     }
 
-    // Execute tools
     const calledTools = response.tool_calls.map((tc) => tc.name);
     const hasSave = calledTools.includes("save_booking");
     const hasDetails = calledTools.includes("get_hotel_details");
     const hasSearch = calledTools.includes("search_hotels");
 
+    // ── Guard: block save_booking if required fields are missing ─────────────
+    if (hasSave) {
+      const missing = getMissingFields(session.context);
+      const checkInOk = isValidBookingDate(session.context.checkIn);
+      const checkOutOk = isValidBookingDate(session.context.checkOut);
+
+      if (missing.length > 0 || !checkInOk || !checkOutOk) {
+        const missingList = [
+          ...missing,
+          !checkInOk ? "checkIn (valid 2026 date required)" : null,
+          !checkOutOk ? "checkOut (valid 2026 date required)" : null,
+        ].filter(Boolean);
+
+        logger.warn(`[Booking] save_booking blocked — missing: ${missingList.join(", ")}`);
+
+        messages.push({
+          role: "user",
+          content:
+            `SYSTEM: Cannot save booking yet. Still need from the user: ${missingList.join(", ")}. ` +
+            `Ask the user for these missing details before calling save_booking again.`,
+        });
+        continue; // loop without executing save
+      }
+
+      // ── Extract & sync context from LLM's save_booking args ──────────────
+      const saveArgs = response.tool_calls.find((tc) => tc.name === "save_booking")?.args || {};
+      if (saveArgs.checkIn && isValidBookingDate(saveArgs.checkIn)) session.context.checkIn = saveArgs.checkIn;
+      if (saveArgs.checkOut && isValidBookingDate(saveArgs.checkOut)) session.context.checkOut = saveArgs.checkOut;
+      if (saveArgs.guests) session.context.guests = saveArgs.guests;
+      if (saveArgs.rooms) session.context.rooms = saveArgs.rooms;
+      if (saveArgs.paymentMethod) session.context.paymentMethod = saveArgs.paymentMethod;
+      if (saveArgs.specialRequests !== undefined) session.context.specialRequests = saveArgs.specialRequests;
+      if (saveArgs.hotelId && /^[a-f\d]{24}$/i.test(saveArgs.hotelId)) session.context.selectedHotelId = saveArgs.hotelId;
+    }
+
     const toolResult = await bookingToolNode.invoke({ messages });
     messages.push(...toolResult.messages);
 
-    // Advance step explicitly based on which tools ran
+    // Advance step based on which tools ran
     if (hasSearch && !hasSave) session.context._nextStep = "hotel_selection";
     if (hasDetails) session.context._nextStep = "payment";
 
-    // Extract hotel ID from get_hotel_details result → store in session
+    // Extract hotel ID from get_hotel_details → store in session
     if (hasDetails) {
       for (const tm of toolResult.messages) {
         try {
@@ -213,10 +282,10 @@ async function bookingAgentNode(state) {
   }
 
   if (!finalReply) {
-    // Loop exhausted — ask LLM to summarise in plain language
+    // Loop exhausted — ask LLM to summarise
     messages.push({
       role: "user",
-      content: "Please give me a friendly summary of what just happened and what the next step is.",
+      content: "Please give a friendly summary of where we are and what the next step is.",
     });
     const recovery = await bookingLLMWithTools.invoke(messages);
     tokensUsed += recovery.usage_metadata?.total_tokens || 0;
@@ -235,16 +304,14 @@ async function sessionSaverNode(state) {
   const finalReply = state._rawReply;
   const bookingId = state._bookingId;
 
-  // Step is advanced explicitly by the agent node via session.context._nextStep,
-  // or inferred from what tools were called (stored in session.context._lastTool).
-  // Keyword scan is a last-resort fallback only.
+  // Step advancement: event-driven first, keyword fallback last
   if (bookingId) {
     session.step = "complete";
   } else if (session.context._nextStep) {
     session.step = session.context._nextStep;
     delete session.context._nextStep;
   } else {
-    // Fallback: keyword scan on the reply
+    // Keyword fallback
     const replyLower = finalReply.toLowerCase();
     for (const [step, keywords] of Object.entries(STEP_KEYWORDS)) {
       if (keywords.some((kw) => replyLower.includes(kw))) {

@@ -52,7 +52,7 @@ router.use(protect);
 
 // ── Protected routes ───────────────────────────────────────────────────────────
 router.get("/my", subscriptionController.getMySubscription);
-router.patch("/change-plan", subscriptionController.changePlan);
+// router.patch("/change-plan", subscriptionController.changePlan);
 router.patch("/cancel", subscriptionController.cancelSubscription); // ← 
 
 // ── Payment routes ─────────────────────────────────────────────────────────────
