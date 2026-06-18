@@ -31,11 +31,11 @@
 //   const booking = await bookingService.adminUpdateStatus(req.params.id, req.body.status);
 //   successResponse(res, { message: "Booking status updated", data: booking });
 // });
-import asyncHandler from "../../../utils/asyncHandler.js";
-import * as bookingPaymentService from "./bookingPayment.service.js";
-import { successResponse, createdResponse } from "../../../utils/apiResponse.js";
-import ApiError from "../../../utils/apiError.js";
-import { getStripeWebhookPayload } from "../../../middleware/stripeWebhook.middleware.js";
+import asyncHandler from "../../utils/asyncHandler.js";
+import * as bookingService from "./booking.service.js";
+import { successResponse, createdResponse } from "../../utils/apiResponse.js";
+import ApiError from "../../utils/apiError.js";
+import { getStripeWebhookPayload } from "../../middleware/stripeWebhook.middleware.js";
 
 // Stripe Checkout — returns a URL to pay in the browser (same flow as subscription upgrade)
 export const createBookingCheckout = asyncHandler(async (req, res) => {
@@ -45,7 +45,7 @@ export const createBookingCheckout = asyncHandler(async (req, res) => {
     throw new ApiError("bookingId is required", 400);
   }
 
-  const result = await bookingPaymentService.createBookingCheckoutSession(
+  const result = await bookingService.createBookingCheckoutSession(
     bookingId,
     req.user._id,
     currency
@@ -71,7 +71,7 @@ export const handleWebhook = async (req, res) => {
   }
 
   try {
-    await bookingPaymentService.handleWebhookEvent(payload, sig);
+    await bookingService.handleWebhookEvent(payload, sig);
     res.json({ received: true });
   } catch (err) {
     console.error(`Webhook Error: ${err.message}`);
@@ -82,7 +82,7 @@ export const handleWebhook = async (req, res) => {
 export const getPaymentStatus = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
-  const result = await bookingPaymentService.getPaymentStatus(
+  const result = await bookingService.getPaymentStatus(
     bookingId,
     req.user._id
   );
@@ -94,7 +94,7 @@ export const getPaymentStatus = asyncHandler(async (req, res) => {
 });
 // =====================update===(Cancelled Bookings/Average Booking Price/Revenue)
 export const getRevenueStats = asyncHandler(async (req, res) => {
-  const data = await bookingPaymentService.getRevenueStats();
+  const data = await bookingService.getRevenueStats();
 
   successResponse(res, {
     message: "Revenue stats fetched successfully",
@@ -103,7 +103,7 @@ export const getRevenueStats = asyncHandler(async (req, res) => {
 });
 
 export const getAverageBookingPrice = asyncHandler(async (req, res) => {
-  const data = await bookingPaymentService.getAverageBookingPrice();
+  const data = await bookingService.getAverageBookingPrice();
 
   successResponse(res, {
     message: "Average booking price fetched successfully",
@@ -112,7 +112,7 @@ export const getAverageBookingPrice = asyncHandler(async (req, res) => {
 });
 
 export const getCancelledBookingsCount = asyncHandler(async (req, res) => {
-  const data = await bookingPaymentService.getCancelledBookingsCount();
+  const data = await bookingService.getCancelledBookingsCount();
 
   successResponse(res, {
     message: "Cancelled bookings fetched successfully",

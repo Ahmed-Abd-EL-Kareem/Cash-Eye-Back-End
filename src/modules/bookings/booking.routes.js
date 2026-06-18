@@ -18,9 +18,9 @@
 
 // export default router;
 import { Router } from "express";
-import * as bookingPaymentController from "./bookingPayment.controller.js";
-import { protect } from "../../../middleware/auth.middleware.js";
-import { restrictTo } from "../../../middleware/role.middleware.js";
+import * as bookingController from "./booking.controller.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { restrictTo } from "../../middleware/role.middleware.js";
 
 const router = Router();
 
@@ -28,20 +28,20 @@ const router = Router();
 router.post(
   "/pay/checkout",
   protect,
-  bookingPaymentController.createBookingCheckout
+  bookingController.createBookingCheckout
 );
 
 // Stripe calls this after checkout payment
 router.post(
   "/webhook",
-  bookingPaymentController.handleWebhook
+  bookingController.handleWebhook
 );
 
 // Get payment status for a booking
 router.get(
   "/status/:bookingId",
   protect,
-  bookingPaymentController.getPaymentStatus
+  bookingController.getPaymentStatus
 );
 
 // ─────────────────────────────────────────────
@@ -53,7 +53,7 @@ router.get(
   "/admin/revenue",
   protect,
   restrictTo("admin"),
-  bookingPaymentController.getRevenueStats
+  bookingController.getRevenueStats
 );
 
 // Average Booking Price
@@ -61,7 +61,7 @@ router.get(
   "/admin/avg-price",
   protect,
   restrictTo("admin"),
-  bookingPaymentController.getAverageBookingPrice
+  bookingController.getAverageBookingPrice
 );
 
 // Cancelled Bookings Count
@@ -69,6 +69,6 @@ router.get(
   "/admin/cancelled",
   protect,
   restrictTo("admin"),
-  bookingPaymentController.getCancelledBookingsCount
+  bookingController.getCancelledBookingsCount
 );
 export default router;
