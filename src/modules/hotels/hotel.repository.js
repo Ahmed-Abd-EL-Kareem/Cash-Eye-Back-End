@@ -66,3 +66,6 @@ export const softDeleteById = async (id) => {
     { new: true }
   ).lean();
 };
+export const getDistinct = async (field, filter = {}) => {
+  return HotelModel.distinct(field, filter);
+};

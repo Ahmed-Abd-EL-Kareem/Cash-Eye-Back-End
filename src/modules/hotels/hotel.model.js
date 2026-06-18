@@ -53,7 +53,10 @@ const hotelSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
+    region: {
+      type: String,
+      trim: true,
+    },
     address: {
       en: String,
       ar: String,

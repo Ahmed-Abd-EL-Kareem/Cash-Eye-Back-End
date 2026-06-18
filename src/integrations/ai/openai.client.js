@@ -20,8 +20,12 @@ export const chatClient = new OpenAI({
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 export const embeddingClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.NVIDIA_API_KEY,
+  baseURL: "https://integrate.api.nvidia.com/v1",
 });
+// export const embeddingClient = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY,
+// });
 
 if (!process.env.NVIDIA_API_KEY) {
   logger.warn("[NVIDIA] NVIDIA_API_KEY is not set");

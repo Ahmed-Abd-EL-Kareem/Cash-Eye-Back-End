@@ -64,6 +64,16 @@ export const updateUserById = async (id, data) => {
   return user;
 };
 
+export const changePassword = async (id, { currentPassword, newPassword }) => {
+  const user = await UserModel.findById(id).select("+password");
+  if (!user) throw new ApiError("No user found with this id", 404);
+
+  const isMatch = await user.correctPassword(currentPassword);
+  if (!isMatch) throw new ApiError("Current password is incorrect", 401);
+
+  user.password = newPassword;
+  await user.save();
+};
 export const deleteUserById = async (id) => {
   const user = await UserModel.findByIdAndDelete(id);
   if (!user) throw new ApiError("No user found with this id", 404);
