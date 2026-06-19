@@ -15,12 +15,12 @@ router.get("/nearby", hotelController.getNearbyHotels);
 
 router.get("/slug/:slug", hotelController.getHotelBySlug);
 
-router.get("/:id", validateObjectId, hotelController.getHotel);
 
 // Admin
 router.use(protect, restrictTo("admin"));
 router.get("/admin/stats", hotelController.getHotelStats);
 
+router.get("/:id", validateObjectId, hotelController.getHotel);
 router.get("/meta", hotelController.getHotelMeta);
 
 router.post("/", validateCreateHotel, hotelController.createHotel);

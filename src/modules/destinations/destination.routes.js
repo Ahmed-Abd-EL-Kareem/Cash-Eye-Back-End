@@ -18,7 +18,6 @@ const router = Router();
 router.get("/nearby", destinationController.getNearbyDestinations);
 router.get("/slug/:slug", destinationController.getDestinationBySlug);
 router.get("/", destinationController.getDestinations);
-router.get("/:id", validateObjectId, destinationController.getDestination);
 // ─── Admin-only specific routes (لازم قبل /:id) ────────────
 router.get(
   "/admin/stats",
@@ -32,6 +31,7 @@ router.get(
   restrictTo("admin"),
   destinationController.getTrendingDestinations,
 );
+router.get("/:id", validateObjectId, destinationController.getDestination);
 
 // ─── Admin only ───────────────────────────────────────────────────────────────
 router.use(protect, restrictTo("admin"));
