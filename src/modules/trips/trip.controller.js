@@ -143,7 +143,7 @@ export const getTripById = asyncHandler(async (req, res) => {
 // PATCH /api/v1/trips/:id
 export const updateTrip = asyncHandler(async (req, res) => {
   const trip = await tripService.updateTrip(
-    req.params.id, req.user._id, req.body
+    req.params.id, req.user._id, req.body,req.user.role
   );
   successResponse(res, { message: "Trip updated successfully", data: trip });
 });

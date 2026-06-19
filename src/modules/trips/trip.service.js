@@ -286,7 +286,7 @@ export const getTripById = async (tripId, userId) => {
 };
 
 // ─── Update trip ──────────────────────────────────────────────────────────────
-export const updateTrip = async (tripId, userId, updates) => {
+export const updateTrip = async (tripId, userId, updates,role) => {
   const ALLOWED = [
     "title",
     "destination",
@@ -304,12 +304,20 @@ export const updateTrip = async (tripId, userId, updates) => {
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
-
-  const trip = await TripModel.findOneAndUpdate(
-    { _id: tripId, user: userId },
+  let trip = null;
+  if(role === "admin"){
+    trip = await TripModel.findOneAndUpdate(
+    { _id: tripId },
     filtered,
-    { new: true, runValidators: true }
-  );
+     { returnDocument: "after", runValidators: true }
+   )
+  }else{
+     trip = await TripModel.findOneAndUpdate(
+      { _id: tripId, user: userId },
+      filtered,
+      { returnDocument: "after", runValidators: true }
+    );
+  }
   if (!trip) throw new ApiError("Trip not found", 404);
   return trip;
 };

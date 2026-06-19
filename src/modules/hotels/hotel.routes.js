@@ -19,6 +19,7 @@ router.get("/slug/:slug", hotelController.getHotelBySlug);
 // Admin
 router.use(protect, restrictTo("admin"));
 router.get("/admin/stats", hotelController.getHotelStats);
+router.get("/top", hotelController.getTopHotels);
 
 router.get("/:id", validateObjectId, hotelController.getHotel);
 router.get("/meta", hotelController.getHotelMeta);
