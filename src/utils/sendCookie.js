@@ -5,7 +5,7 @@ const sendCookie = (res, token) => {
     ),
     httpOnly: true,
     secure: true,
-    sameSite: "Lax",
+    sameSite: "None",
   });
 };
 
