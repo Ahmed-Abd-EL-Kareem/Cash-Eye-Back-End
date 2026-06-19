@@ -18,9 +18,10 @@
 
 // export default router;
 import { Router } from "express";
-import * as bookingPaymentController from "./bookingPayment.controller.js";
-import { protect } from "../../../middleware/auth.middleware.js";
-import { restrictTo } from "../../../middleware/role.middleware.js";
+// import * as bookingPaymentController from "./bookingPayment.controller.js";
+import * as bookingPaymentController from "./booking.controller.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { restrictTo } from "../../middleware/role.middleware.js";
 
 const router = Router();
 

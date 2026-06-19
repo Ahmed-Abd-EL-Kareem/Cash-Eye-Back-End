@@ -31,11 +31,13 @@
 //   const booking = await bookingService.adminUpdateStatus(req.params.id, req.body.status);
 //   successResponse(res, { message: "Booking status updated", data: booking });
 // });
-import asyncHandler from "../../../utils/asyncHandler.js";
-import * as bookingPaymentService from "./bookingPayment.service.js";
-import { successResponse, createdResponse } from "../../../utils/apiResponse.js";
-import ApiError from "../../../utils/apiError.js";
-import { getStripeWebhookPayload } from "../../../middleware/stripeWebhook.middleware.js";
+// import asyncHandler from "../../../utils/asyncHandler.js";
+import asyncHandler from "../../utils/asyncHandler.js"; ;
+// import * as bookingPaymentService from "./bookingPayment.service.js";
+import * as bookingPaymentService from "./booking.service.js";
+import { successResponse, createdResponse } from "../../utils/apiResponse.js";
+import ApiError from "../../utils/apiError.js";
+import { getStripeWebhookPayload } from "../../middleware/stripeWebhook.middleware.js";
 
 // Stripe Checkout — returns a URL to pay in the browser (same flow as subscription upgrade)
 export const createBookingCheckout = asyncHandler(async (req, res) => {

@@ -129,13 +129,18 @@
 //   if (!booking) throw new ApiError("Booking not found", 404);
 //   return booking;
 // };
-import stripe from "../../../utils/stripe.js";
-import BookingModel from "../../bookings/booking.model.js";
-import UserModel from "../../users/user.model.js";
-import ApiError from "../../../utils/apiError.js";
-import logger from "../../../config/logger.js";
+// import stripe from "../../../utils/stripe.js";
+import stripe from "../../utils/stripe.js";
+// import BookingModel from "../../bookings/booking.model.js";
+import BookingModel from "./booking.model.js";
+// import UserModel from "../../users/user.model.js";
+import UserModel from "../users/user.model.js";
+import ApiError from "../../utils/apiError.js";
+// import logger from "../../../config/logger.js";
+import logger from "../../config/logger.js";
 // update==================
-import SubscriptionModel from "../../subscriptions/subscription.model.js";
+// import SubscriptionModel from "../../subscriptions/subscription.model.js";
+import SubscriptionModel from "../subscriptions/subscription.model.js";
 
 const getPaymentIntentId = (session) => {
   const pi = session.payment_intent;

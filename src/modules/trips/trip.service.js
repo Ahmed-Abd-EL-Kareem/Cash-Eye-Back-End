@@ -135,6 +135,10 @@ import TripModel from "./trip.model.js";
 import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
+import {
+  normalizeInterests,
+  buildCategoryFilter,
+} from "./tripInterests.util.js";
 
 // import { generateTripPlan } from "../../integrations/ai/tripPlanner.ai.js";
  import { createUsage } from "../aiUsage/aiUsage.service.js";
@@ -162,7 +166,7 @@ export const generateAndSaveTrip = async (userId, params) => {
       duration,
       budget: budget || "mid-range",
       travelers: travelers || 1,
-      interests: interests || [],
+      interests: normalizeInterests(interests),
       language: language || "en",
     });
 
@@ -174,7 +178,7 @@ export const generateAndSaveTrip = async (userId, params) => {
       duration,
       budget: budget || "mid-range",
       travelers: travelers || 1,
-      interests: interests || [],
+      interests: normalizeInterests(interests),
       language: language || "en",
       days: aiResult.days,
       summary: aiResult.summary,
@@ -277,7 +281,7 @@ export const createManualTrip = async (userId, params) => {
     duration,
     budget: budget || "mid-range",
     travelers: travelers || 1,
-    interests: interests || [],
+    interests: normalizeInterests(interests),
     language: language || "en",
     days: days || [],
     summary: summary || null,
@@ -322,6 +326,10 @@ const ALLOWED = [
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
 
+  if (filtered.interests !== undefined) {
+    filtered.interests = normalizeInterests(filtered.interests);
+  }
+
   const trip = await TripModel.findOneAndUpdate(
     { _id: tripId, user: userId },
     filtered,
@@ -339,32 +347,83 @@ export const deleteTrip = async (tripId, userId) => {
 };
 
 // ─── Admin: all trips ─────────────────────────────────────────────────────────
+const preprocessAdminTripsQuery = (query) => {
+  const apiQuery = { ...query };
+  const extraFilters = {};
+
+  const category = apiQuery.category || apiQuery.interest;
+  if (category && category !== "All") {
+    const categoryFilter = buildCategoryFilter(category);
+    if (categoryFilter) {
+      Object.assign(extraFilters, categoryFilter);
+    }
+    delete apiQuery.category;
+    delete apiQuery.interest;
+  }
+
+  if (apiQuery.budgetRange && apiQuery.budgetRange !== "All") {
+    const range = apiQuery.budgetRange;
+    delete apiQuery.budgetRange;
+    if (range === "under2000") {
+      apiQuery["estimatedTotalCost[lt]"] = 2000;
+    } else if (range === "2000to5000") {
+      apiQuery["estimatedTotalCost[gte]"] = 2000;
+      apiQuery["estimatedTotalCost[lte]"] = 5000;
+    } else if (range === "over5000") {
+      apiQuery["estimatedTotalCost[gt]"] = 5000;
+    }
+  }
+
+  if (apiQuery.isAIGenerated === "true") apiQuery.isAIGenerated = true;
+  else if (apiQuery.isAIGenerated === "false") apiQuery.isAIGenerated = false;
+
+  return { apiQuery, extraFilters };
+};
+
 export const adminGetAllTrips = async (query) => {
+  const { apiQuery, extraFilters } = preprocessAdminTripsQuery(query);
+
   const features = new APIFeatures(
     TripModel,
     TripModel.find().populate("user", "name email"),
-    query
+    apiQuery
   )
     .filter()
-    .search(["title", "destination"])
-    .sort()
-    .paginate();
+    .search(["title", "destination", "status", "summary", "interests"])
+    .sort();
+
+  if (Object.keys(extraFilters).length) {
+    const mergedFilter =
+      Object.keys(features.filterQuery).length > 0
+        ? { $and: [features.filterQuery, extraFilters] }
+        : extraFilters;
+    features.filterQuery = mergedFilter;
+    features.query = TripModel.find(mergedFilter).populate("user", "name email");
+    if (apiQuery.sort) {
+      features.query = features.query.sort(apiQuery.sort.split(",").join(" "));
+    } else {
+      features.query = features.query.sort("-createdAt");
+    }
+  }
+
+  features.paginate();
 
   const [trips, total] = await Promise.all([
     features.query,
     features.countDocuments(),
   ]);
 
+  const limit = features.limit || 10;
+
   return {
     trips,
     pagination: {
       total,
       page: features.page,
-      limit: features.limit,
-      totalPages: Math.ceil(total / features.limit),
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
     },
   };
-    
 };
 export const adminGetTripById = async (tripId) => {
   const trip = await TripModel.findById(tripId)
@@ -394,6 +453,10 @@ export const adminUpdateTrip = async (tripId, updates) => {
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
+
+  if (filtered.interests !== undefined) {
+    filtered.interests = normalizeInterests(filtered.interests);
+  }
 
   const trip = await TripModel.findByIdAndUpdate(
     tripId,
