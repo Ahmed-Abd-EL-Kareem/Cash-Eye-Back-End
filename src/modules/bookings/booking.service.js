@@ -11,13 +11,14 @@ export const createBooking = async (userId, data) => {
   const checkIn = new Date(data.checkIn);
   const checkOut = new Date(data.checkOut);
 
-  if (checkIn < new Date()) throw new ApiError("checkIn must be a future date", 400);
+  if (checkIn < new Date())
+    throw new ApiError("checkIn must be a future date", 400);
 
   const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
   if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
 
-   const totalPrice = hotel.averagePricePerNight * nights * (data.rooms || 1);
+  const totalPrice = hotel.averagePricePerNight * nights * (data.rooms || 1);
 
   const booking = await BookingModel.create({
     user: userId,
@@ -33,7 +34,10 @@ export const createBooking = async (userId, data) => {
   });
 
   return booking.populate([
-    { path: "hotel", select: "name city averagePricePerNight stars currency coverImage" },
+    {
+      path: "hotel",
+      select: "name city averagePricePerNight stars currency coverImage",
+    },
     { path: "trip", select: "title destination" },
   ]);
 };
@@ -42,10 +46,15 @@ export const createBooking = async (userId, data) => {
 export const getMyBookings = async (userId, query) => {
   const features = new APIFeatures(
     BookingModel,
-    BookingModel.find({ user: userId })
-      .populate("hotel", "name city averagePricePerNight stars coverImage"),
-    query
-  ).filter().sort().paginate();
+    BookingModel.find({ user: userId }).populate(
+      "hotel",
+      "name city averagePricePerNight stars coverImage",
+    ),
+    query,
+  )
+    .filter()
+    .sort()
+    .paginate();
 
   const [bookings, total] = await Promise.all([
     features.query,
@@ -96,8 +105,11 @@ export const adminGetAllBookings = async (query) => {
     BookingModel.find()
       .populate("user", "name email")
       .populate("hotel", "name city"),
-    query
-  ).filter().sort().paginate();
+    query,
+  )
+    .filter()
+    .sort()
+    .paginate();
 
   const [bookings, total] = await Promise.all([
     features.query,
@@ -124,8 +136,190 @@ export const adminUpdateStatus = async (bookingId, status) => {
   const booking = await BookingModel.findByIdAndUpdate(
     bookingId,
     { status },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
   if (!booking) throw new ApiError("Booking not found", 404);
   return booking;
+};
+
+export const getBookingStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
+
+  const [
+    totalBookings,
+    thisMonthBookings,
+    lastMonthBookings,
+    byStatus,
+    revenueStats,
+    lastMonthRevenue,
+    revenueByMonthRaw,
+    bookingTrends,
+    topHotels,
+  ] = await Promise.all([
+    // Total bookings
+    BookingModel.countDocuments(),
+
+    // This month
+    BookingModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
+
+    // Last month
+    BookingModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+
+    // By status
+    BookingModel.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+
+    // Total revenue this month
+    BookingModel.aggregate([
+      {
+        $match: {
+          status: { $in: ["confirmed", "completed"] },
+          createdAt: { $gte: startOfMonth },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$totalPrice" },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // Last month revenue
+    BookingModel.aggregate([
+      {
+        $match: {
+          status: { $in: ["confirmed", "completed"] },
+          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
+    ]),
+
+    // Revenue chart - last 6 months raw
+    BookingModel.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+          },
+          revenue: { $sum: "$totalPrice" },
+          bookings: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]),
+
+    // Booking trends by day of week
+    BookingModel.aggregate([
+      { $match: { createdAt: { $gte: startOfMonth } } },
+      {
+        $group: {
+          _id: { $dayOfWeek: "$createdAt" },
+          hotels: { $sum: 1 },
+          revenue: { $sum: "$totalPrice" },
+        },
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          day: {
+            $arrayElemAt: [
+              ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+              { $subtract: ["$_id", 1] },
+            ],
+          },
+          hotels: 1,
+          revenue: 1,
+        },
+      },
+    ]),
+
+    // Top performing hotels by revenue
+    BookingModel.aggregate([
+      { $match: { status: { $in: ["confirmed", "completed"] } } },
+      {
+        $group: {
+          _id: "$hotel",
+          revenue: { $sum: "$totalPrice" },
+          bookings: { $sum: 1 },
+        },
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "hotels",
+          localField: "_id",
+          foreignField: "_id",
+          as: "hotel",
+        },
+      },
+      { $unwind: "$hotel" },
+      {
+        $project: {
+          _id: 0,
+          name: "$hotel.name",
+          city: "$hotel.city",
+          stars: "$hotel.stars",
+          coverImage: "$hotel.coverImage",
+          revenue: 1,
+          bookings: 1,
+        },
+      },
+    ]),
+  ]);
+
+  // بناء الـ 6 شهور كلها حتى لو فاضية
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
+
+  const revenueByMonth = last6Months.map(({ year, month }) => {
+    const found = revenueByMonthRaw.find(
+      (r) => r._id?.year === year && r._id?.month === month,
+    );
+    const date = new Date(year, month - 1, 1);
+    return {
+      month: date.toLocaleString("en", { month: "short" }),
+      revenue: found?.revenue || 0,
+      bookings: found?.bookings || 0,
+    };
+  });
+
+  const thisMonthRevenue = revenueStats[0]?.total || 0;
+  const prevMonthRevenue = lastMonthRevenue[0]?.total || 0;
+
+  return {
+    totalBookings,
+    bookingsGrowth: calcGrowth(thisMonthBookings, lastMonthBookings),
+    totalRevenue: thisMonthRevenue,
+    revenueGrowth: calcGrowth(thisMonthRevenue, prevMonthRevenue),
+    byStatus,
+    revenueByMonth,
+    bookingTrends,
+    topHotels,
+  };
 };

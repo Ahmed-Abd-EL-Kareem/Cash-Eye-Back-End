@@ -43,6 +43,7 @@ router.patch(
   restrictTo("admin"),
   tripController.adminUpdateTrip
 );
+router.get("/stats", restrictTo("admin"), tripController.getTripStats);
 router.post("/generate", checkAIQuota(true), tripController.generateTrip);
 // router.post("/generate", tripController.generateTrip);
 

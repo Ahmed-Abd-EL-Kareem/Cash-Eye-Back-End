@@ -2,7 +2,8 @@ import * as repo from "./hotel.repository.js";
 import ApiError from "../../utils/apiError.js";
 import { indexHotel } from "../../integrations/langchain/rag.retriever.js";
 import logger from "../../config/logger.js";
-
+import HotelModel from "./hotel.model.js";
+import BookingModel from "../bookings/booking.model.js";
 const buildFilter = ({ city, stars, minPrice, maxPrice, search } = {}) => {
   const filter = { isActive: true };
 
@@ -117,4 +118,124 @@ export const getHotelMeta = async () => {
     roomTypes: ["single", "double", "suite", "family"],
     currencies: ["EGP", "USD"],
   };
+};
+export const getHotelStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
+
+  const [
+    totalHotels,
+    activeHotels,
+    thisMonthHotels,
+    lastMonthHotels,
+    byStars,
+    byCity,
+    topHotels,
+    priceStats,
+  ] = await Promise.all([
+    // Total
+    HotelModel.countDocuments(),
+
+    // Active
+    HotelModel.countDocuments({ isActive: true }),
+
+    // Added this month
+    HotelModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
+
+    // Added last month
+    HotelModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+
+    // Distribution by stars
+    HotelModel.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$stars", count: { $sum: 1 } } },
+      { $sort: { _id: -1 } },
+    ]),
+
+    // Top cities by hotel count
+    HotelModel.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$city", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]),
+
+    // Top 5 hotels by price (Top Performing)
+    HotelModel.find({ isActive: true })
+      .sort({ averagePricePerNight: -1 })
+      .limit(5)
+      .select("name city stars averagePricePerNight currency coverImage"),
+
+    // Avg price across all hotels
+    HotelModel.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: null,
+          avgPrice: { $avg: "$averagePricePerNight" },
+          minPrice: { $min: "$averagePricePerNight" },
+          maxPrice: { $max: "$averagePricePerNight" },
+        },
+      },
+    ]),
+  ]);
+
+  return {
+    total: totalHotels,
+    active: activeHotels,
+    inactive: totalHotels - activeHotels,
+    growth: calcGrowth(thisMonthHotels, lastMonthHotels),
+    byStars,
+    byCity,
+    topHotels,
+    priceStats: priceStats[0] || { avgPrice: 0, minPrice: 0, maxPrice: 0 },
+  };
+};
+export const getTopHotels = async (limit = 5) => {
+  const hotels = await repo.findAll({
+    filter: { isActive: true },
+    sort: { averagePricePerNight: -1 },
+    skip: 0,
+    limit: Math.min(50, Number(limit) || 5),
+  });
+
+  const hotelIds = hotels.map((h) => h._id);
+
+  const bookingStats = await BookingModel.aggregate([
+    {
+      $match: {
+        hotel: { $in: hotelIds },
+        status: { $in: ["confirmed", "completed"] },
+      },
+    },
+    {
+      $group: {
+        _id: "$hotel",
+        bookings: { $sum: 1 },
+        revenue: { $sum: "$totalPrice" },
+      },
+    },
+  ]);
+
+  const statsMap = new Map(bookingStats.map((s) => [s._id.toString(), s]));
+
+  return hotels.map((hotel) => {
+    const stats = statsMap.get(hotel._id.toString());
+    return {
+      name: hotel.name?.en || hotel.name,
+      location: hotel.city,
+      revenue: stats?.revenue || 0,
+      bookings: stats?.bookings || 0,
+      rating: hotel.stars,
+    };
+  });
 };

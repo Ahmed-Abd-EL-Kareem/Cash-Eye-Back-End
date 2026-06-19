@@ -387,3 +387,14 @@ export const adminUpdateTrip = async (tripId, updates) => {
 
   return trip;
 };
+export const getTripStats = async () => {
+  const [totalTrips, activeTripsNow] = await Promise.all([
+    TripModel.countDocuments({ status: { $ne: "archived" } }),
+    TripModel.countDocuments({
+      status: "saved",
+      updatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    }),
+  ]);
+
+  return { totalTrips, activeTripsNow };
+};

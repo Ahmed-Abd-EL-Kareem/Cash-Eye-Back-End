@@ -5,6 +5,7 @@ import * as UserController from "./user.controller.js";
 
 const router = express.Router();
 
+router.get("/stats", protect, restrictTo("admin"), UserController.getUserStats);
 router
   .route("/")
   .get(protect, UserController.getUsers)

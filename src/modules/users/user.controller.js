@@ -61,3 +61,9 @@ export const deleteUser = asyncHandler(async (req, res) => {
     data: null,
   });
 });
+
+export const getUserStats = asyncHandler(async (req, res) => {
+  const stats = await userService.getUserStats();
+
+  res.status(200).json({ status: "success", data: stats });
+});

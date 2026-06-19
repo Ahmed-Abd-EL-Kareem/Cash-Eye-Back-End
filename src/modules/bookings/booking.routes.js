@@ -7,10 +7,12 @@ const router = Router();
 
 router.use(protect);
 
-// User routes — /admin/* before /:id to avoid Express param collision
+// ─── Admin ────────────────────────────────────────────────────────────────────
+router.get("/admin/stats", restrictTo("admin"), bookingController.getBookingStats); 
 router.get("/admin/all", restrictTo("admin"), bookingController.adminGetAllBookings);
 router.patch("/admin/:id/status", restrictTo("admin"), bookingController.adminUpdateStatus);
 
+// ─── User ─────────────────────────────────────────────────────────────────────
 router.post("/", bookingController.createBooking);
 router.get("/", bookingController.getMyBookings);
 router.get("/:id", bookingController.getBookingById);
