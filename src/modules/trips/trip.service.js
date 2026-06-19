@@ -121,30 +121,13 @@
 // trip.service.js (excerpt — only generateAndSaveTrip changes)
 // Replace the old import of generateTripPlan from tripPlanner.ai.js with
 // the one from multi.agent.js. Everything else is identical.
-
-
-
-
-
-
-
-
-
-
+// ? ///////////////////////////////////////////////////////////////
 import TripModel from "./trip.model.js";
 import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
-import {
-  normalizeInterests,
-  buildCategoryFilter,
-} from "./tripInterests.util.js";
-
-// import { generateTripPlan } from "../../integrations/ai/tripPlanner.ai.js";
- import { createUsage } from "../aiUsage/aiUsage.service.js";
-
-import { generateTripPlan } from "../../integrations/langchain/tripPlanner.ai.js";
-
+import { generateTripPlan } from "../../integrations/ai/tripPlanner.ai.js";
+import { createUsage } from "../aiUsage/aiUsage.service.js";
 
 // ─── Generate + save AI trip ──────────────────────────────────────────────────
 export const generateAndSaveTrip = async (userId, params) => {
@@ -166,7 +149,7 @@ export const generateAndSaveTrip = async (userId, params) => {
       duration,
       budget: budget || "mid-range",
       travelers: travelers || 1,
-      interests: normalizeInterests(interests),
+      interests: interests || [],
       language: language || "en",
     });
 
@@ -178,7 +161,7 @@ export const generateAndSaveTrip = async (userId, params) => {
       duration,
       budget: budget || "mid-range",
       travelers: travelers || 1,
-      interests: normalizeInterests(interests),
+      interests: interests || [],
       language: language || "en",
       days: aiResult.days,
       summary: aiResult.summary,
@@ -233,11 +216,7 @@ export const getMyTrips = async (userId, query) => {
     TripModel,
     TripModel.find({ user: userId }),
     query
-  )
-    .filter()
-    .search(["title", "destination"])
-    .sort()
-    .paginate();
+  ).filter().search(["title", "destination"]).sort().paginate();
 
   const [trips, total] = await Promise.all([
     features.query,
@@ -281,7 +260,7 @@ export const createManualTrip = async (userId, params) => {
     duration,
     budget: budget || "mid-range",
     travelers: travelers || 1,
-    interests: normalizeInterests(interests),
+    interests: interests || [],
     language: language || "en",
     days: days || [],
     summary: summary || null,
@@ -307,34 +286,38 @@ export const getTripById = async (tripId, userId) => {
 };
 
 // ─── Update trip ──────────────────────────────────────────────────────────────
-export const updateTrip = async (tripId, userId, updates) => {
-const ALLOWED = [
- "title",
-  "destination",
-  "duration",
-  "budget",
-  "estimatedTotalCost",
-  "travelers",
-  "language",
-  "status",
-  "days",
-  "summary",
-  "interests",
-  "imageUrl",
-];
+export const updateTrip = async (tripId, userId, updates,role) => {
+  const ALLOWED = [
+    "title",
+    "destination",
+    "duration",
+    "budget",
+    "estimatedTotalCost",
+    "travelers",
+    "language",
+    "status",
+    "days",
+    "summary",
+    "interests",
+    "imageUrl",
+  ];
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
-
-  if (filtered.interests !== undefined) {
-    filtered.interests = normalizeInterests(filtered.interests);
-  }
-
-  const trip = await TripModel.findOneAndUpdate(
-    { _id: tripId, user: userId },
+  let trip = null;
+  if(role === "admin"){
+    trip = await TripModel.findOneAndUpdate(
+    { _id: tripId },
     filtered,
-    { new: true, runValidators: true }
-  );
+     { returnDocument: "after", runValidators: true }
+   )
+  }else{
+     trip = await TripModel.findOneAndUpdate(
+      { _id: tripId, user: userId },
+      filtered,
+      { returnDocument: "after", runValidators: true }
+    );
+  }
   if (!trip) throw new ApiError("Trip not found", 404);
   return trip;
 };
@@ -386,27 +369,8 @@ export const adminGetAllTrips = async (query) => {
   const features = new APIFeatures(
     TripModel,
     TripModel.find().populate("user", "name email"),
-    apiQuery
-  )
-    .filter()
-    .search(["title", "destination", "status", "summary", "interests"])
-    .sort();
-
-  if (Object.keys(extraFilters).length) {
-    const mergedFilter =
-      Object.keys(features.filterQuery).length > 0
-        ? { $and: [features.filterQuery, extraFilters] }
-        : extraFilters;
-    features.filterQuery = mergedFilter;
-    features.query = TripModel.find(mergedFilter).populate("user", "name email");
-    if (apiQuery.sort) {
-      features.query = features.query.sort(apiQuery.sort.split(",").join(" "));
-    } else {
-      features.query = features.query.sort("-createdAt");
-    }
-  }
-
-  features.paginate();
+    query
+  ).filter().search(["title", "destination"]).sort().paginate();
 
   const [trips, total] = await Promise.all([
     features.query,
@@ -420,10 +384,11 @@ export const adminGetAllTrips = async (query) => {
     pagination: {
       total,
       page: features.page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
+      limit: features.limit,
+      totalPages: Math.ceil(total / features.limit),
     },
   };
+
 };
 export const adminGetTripById = async (tripId) => {
   const trip = await TripModel.findById(tripId)
@@ -454,10 +419,6 @@ export const adminUpdateTrip = async (tripId, updates) => {
     Object.entries(updates).filter(([k]) => ALLOWED.includes(k))
   );
 
-  if (filtered.interests !== undefined) {
-    filtered.interests = normalizeInterests(filtered.interests);
-  }
-
   const trip = await TripModel.findByIdAndUpdate(
     tripId,
     filtered,
@@ -470,4 +431,15 @@ export const adminUpdateTrip = async (tripId, updates) => {
   if (!trip) throw new ApiError("Trip not found", 404);
 
   return trip;
+};
+export const getTripStats = async () => {
+  const [totalTrips, activeTripsNow] = await Promise.all([
+    TripModel.countDocuments({ status: { $ne: "archived" } }),
+    TripModel.countDocuments({
+      status: "saved",
+      updatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    }),
+  ]);
+
+  return { totalTrips, activeTripsNow };
 };

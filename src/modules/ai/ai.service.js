@@ -62,7 +62,7 @@ import { chatWithRahal, searchHotels, getHotelRecommendations } from "../../inte
 import { processBookingMessage } from "../../integrations/langchain/aiBookingConversation.js";
 import { generateTripPlan } from "../../integrations/langchain/tripPlanner.ai.js";
 import ApiError from "../../utils/apiError.js";
-
+import { getDashboardStats } from "../aiUsage/aiUsage.service.js";
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 // POST /api/v1/ai/chat
 // Body: { messages: [{ role, content }] }
@@ -104,4 +104,14 @@ export const getRecommendations = async (userId, context = {}) => {
     if (error instanceof ApiError) throw error;
     throw new ApiError(`Failed to get recommendations: ${error.message}`, 500);
   }
+};
+// ─── Dashboard stats ──────────────────────────────────────────────────────────
+export const getAiStats = async () => {
+  const stats = await getDashboardStats();
+
+
+  return {
+    aiRequests: stats.totalRequests ?? 0,
+    aiRequestsGrowth: stats.requestsGrowth ?? 0,
+  };
 };

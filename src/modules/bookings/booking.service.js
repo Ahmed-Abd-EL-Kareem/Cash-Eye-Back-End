@@ -1,73 +1,82 @@
-// import BookingModel from "./booking.model.js";
-// import HotelModel from "../hotels/hotel.model.js";
-// import ApiError from "../../utils/apiError.js";
-// import APIFeatures from "../../utils/apiFeature.js";
+import BookingModel from "./booking.model.js";
+import HotelModel from "../hotels/hotel.model.js";
+import ApiError from "../../utils/apiError.js";
+import APIFeatures from "../../utils/apiFeature.js";
 
-// // ─── Create booking ───────────────────────────────────────────────────────────
-// export const createBooking = async (userId, data) => {
-//   const hotel = await HotelModel.findById(data.hotel);
-//   if (!hotel || !hotel.isActive) throw new ApiError("Hotel not found", 404);
+// ─── Create booking ───────────────────────────────────────────────────────────
+export const createBooking = async (userId, data) => {
+  const hotel = await HotelModel.findById(data.hotel);
+  if (!hotel || !hotel.isActive) throw new ApiError("Hotel not found", 404);
 
-//   const checkIn = new Date(data.checkIn);
-//   const checkOut = new Date(data.checkOut);
+  const checkIn = new Date(data.checkIn);
+  const checkOut = new Date(data.checkOut);
 
-//   if (checkIn < new Date()) throw new ApiError("checkIn must be a future date", 400);
+  if (checkIn < new Date())
+    throw new ApiError("checkIn must be a future date", 400);
 
-//   const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+  const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
-//   if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
+  if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
 
-//    const totalPrice = hotel.averagePricePerNight * nights * (data.rooms || 1);
+  const totalPrice = hotel.averagePricePerNight * nights * (data.rooms || 1);
 
-//   const booking = await BookingModel.create({
-//     user: userId,
-//     hotel: hotel._id,
-//     trip: data.trip || null,
-//     checkIn,
-//     checkOut,
-//     guests: data.guests || 1,
-//     rooms: data.rooms || 1,
-//     totalPrice,
-//     currency: hotel.currency,
-//     specialRequests: data.specialRequests || null,
-//   });
+  const booking = await BookingModel.create({
+    user: userId,
+    hotel: hotel._id,
+    trip: data.trip || null,
+    checkIn,
+    checkOut,
+    guests: data.guests || 1,
+    rooms: data.rooms || 1,
+    totalPrice,
+    currency: hotel.currency,
+    specialRequests: data.specialRequests || null,
+  });
 
-//   return booking.populate([
-//     { path: "hotel", select: "name city averagePricePerNight stars currency coverImage" },
-//     { path: "trip", select: "title destination" },
-//   ]);
-// };
+  return booking.populate([
+    {
+      path: "hotel",
+      select: "name city averagePricePerNight stars currency coverImage",
+    },
+    { path: "trip", select: "title destination" },
+  ]);
+};
 
-// // ─── Get my bookings ──────────────────────────────────────────────────────────
-// export const getMyBookings = async (userId, query) => {
-//   const features = new APIFeatures(
-//     BookingModel,
-//     BookingModel.find({ user: userId })
-//       .populate("hotel", "name city averagePricePerNight stars coverImage"),
-//     query
-//   ).filter().sort().paginate();
+// ─── Get my bookings ──────────────────────────────────────────────────────────
+export const getMyBookings = async (userId, query) => {
+  const features = new APIFeatures(
+    BookingModel,
+    BookingModel.find({ user: userId }).populate(
+      "hotel",
+      "name city averagePricePerNight stars coverImage",
+    ),
+    query,
+  )
+    .filter()
+    .sort()
+    .paginate();
 
-//   const [bookings, total] = await Promise.all([
-//     features.query,
-//     features.countDocuments(),
-//   ]);
+  const [bookings, total] = await Promise.all([
+    features.query,
+    features.countDocuments(),
+  ]);
 
-//   return {
-//     bookings,
-//     pagination: {
-//       total,
-//       page: features.page,
-//       limit: features.limit,
-//       totalPages: Math.ceil(total / features.limit),
-//     },
-//   };
-// };
+  return {
+    bookings,
+    pagination: {
+      total,
+      page: features.page,
+      limit: features.limit,
+      totalPages: Math.ceil(total / features.limit),
+    },
+  };
+};
 
-// // ─── Get single booking (owner only) ─────────────────────────────────────────
-// export const getBookingById = async (bookingId, userId) => {
-//   const booking = await BookingModel.findOne({ _id: bookingId, user: userId })
-//     .populate("hotel")
-//     .populate("trip", "title destination days");
+// ─── Get single booking (owner only) ─────────────────────────────────────────
+export const getBookingById = async (bookingId, userId) => {
+  const booking = await BookingModel.findOne({ _id: bookingId, user: userId })
+    .populate("hotel")
+    .populate("trip", "title destination days");
 
 //   if (!booking) throw new ApiError("Booking not found", 404);
 //   return booking;
@@ -130,17 +139,17 @@
 //   return booking;
 // };
 // import stripe from "../../../utils/stripe.js";
-import stripe from "../../utils/stripe.js";
+// import stripe from "../../utils/stripe.js";
 // import BookingModel from "../../bookings/booking.model.js";
-import BookingModel from "./booking.model.js";
-// import UserModel from "../../users/user.model.js";
-import UserModel from "../users/user.model.js";
-import ApiError from "../../utils/apiError.js";
-// import logger from "../../../config/logger.js";
-import logger from "../../config/logger.js";
+// import BookingModel from "./booking.model.js";
+
+// import UserModel from "../users/user.model.js";
+// import ApiError from "../../utils/apiError.js";
+// // import logger from "../../../config/logger.js";
+// import logger from "../../config/logger.js";
 // update==================
-// import SubscriptionModel from "../../subscriptions/subscription.model.js";
-import SubscriptionModel from "../subscriptions/subscription.model.js";
+// // import SubscriptionModel from "../../subscriptions/subscription.model.js";
+// import SubscriptionModel from "../subscriptions/subscription.model.js";
 
 const getPaymentIntentId = (session) => {
   const pi = session.payment_intent;
@@ -215,267 +224,231 @@ const fulfillBookingFromCheckout = async (session) => {
   booking.paidAt = new Date();
   booking.status = "confirmed";
   await booking.save();
-
-  logger.info(`[Stripe] Booking ${bookingId} payment confirmed via checkout`);
-
-  if (userId && booking.user.toString() !== userId) {
-    logger.warn(`[Stripe] Checkout userId mismatch for booking ${bookingId}`);
-  }
-
   return booking;
 };
 
-const validateBookingForPayment = async (bookingId, userId) => {
-  const booking = await BookingModel.findById(bookingId)
-    .populate("hotel", "name.en name.ar city stars coverImage images")
-    .populate("trip", "title destination duration summary");
+// ─── Admin: get all bookings ──────────────────────────────────────────────────
+export const adminGetAllBookings = async (query) => {
+  const features = new APIFeatures(
+    BookingModel,
+    BookingModel.find()
+      .populate("user", "name email")
+      .populate("hotel", "name city"),
+    query,
+  )
+    .filter()
+    .sort()
+    .paginate();
 
+  const [bookings, total] = await Promise.all([
+    features.query,
+    features.countDocuments(),
+  ]);
+
+  return {
+    bookings,
+    pagination: {
+      total,
+      page: features.page,
+      limit: features.limit,
+      totalPages: Math.ceil(total / features.limit),
+    },
+  };
+};
+
+// ─── Admin: update booking status ─────────────────────────────────────────────
+export const adminUpdateStatus = async (bookingId, status) => {
+  const VALID = ["pending", "confirmed", "canceled", "completed"];
+  if (!VALID.includes(status))
+    throw new ApiError(`status must be one of: ${VALID.join(", ")}`, 400);
+
+  const booking = await BookingModel.findByIdAndUpdate(
+    bookingId,
+    { status },
+    { new: true, runValidators: true },
+  );
   if (!booking) throw new ApiError("Booking not found", 404);
-
-  if (booking.user.toString() !== userId.toString()) {
-    throw new ApiError("Not authorized to pay for this booking", 403);
-  }
-
-  if (booking.paymentStatus === "succeeded") {
-    throw new ApiError("Payment already processed for this booking", 400);
-  }
-
-  if (booking.status === "canceled") {
-    throw new ApiError("Cannot pay for a canceled booking", 400);
-  }
-
   return booking;
 };
 
-export const createBookingCheckoutSession = async (
-  bookingId,
-  userId,
-  currency
-) => {
-  const booking = await validateBookingForPayment(bookingId, userId);
-  const user = await UserModel.findById(userId).select("email name");
+export const getBookingStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  const payCurrency = (currency || booking.currency || "EGP").toLowerCase();
-  const amount = Math.round(booking.totalPrice * 100);
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
 
-  const hotel = booking.hotel;
-  const trip = booking.trip;
-  const hotelName = hotel?.name?.en || hotel?.name || "Hotel booking";
-  const hotelImages = toStripeImages(hotel?.coverImage, ...(hotel?.images || []));
+  const [
+    totalBookings,
+    thisMonthBookings,
+    lastMonthBookings,
+    byStatus,
+    revenueStats,
+    lastMonthRevenue,
+    revenueByMonthRaw,
+    bookingTrends,
+    topHotels,
+  ] = await Promise.all([
+    // Total bookings
+    BookingModel.countDocuments(),
 
-  const productName = trip
-    ? `${hotelName} + Trip: ${trip.title}`
-    : `Hotel — ${hotelName}`;
+    // This month
+    BookingModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: user?.email,
-    line_items: [
+    // Last month
+    BookingModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+
+    // By status
+    BookingModel.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+
+    // Total revenue this month
+    BookingModel.aggregate([
       {
-        price_data: {
-          currency: payCurrency,
-          unit_amount: amount,
-          product_data: {
-            name: productName,
-            description: buildBookingCheckoutDescription(booking),
-            ...(hotelImages.length ? { images: hotelImages } : {}),
+        $match: {
+          status: { $in: ["confirmed", "completed"] },
+          createdAt: { $gte: startOfMonth },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$totalPrice" },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // Last month revenue
+    BookingModel.aggregate([
+      {
+        $match: {
+          status: { $in: ["confirmed", "completed"] },
+          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
+    ]),
+
+    // Revenue chart - last 6 months raw
+    BookingModel.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
           },
         },
-        quantity: 1,
       },
-    ],
-    success_url: `${process.env.FRONTEND_URL}/booking/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
-    cancel_url: `${process.env.FRONTEND_URL}/booking/payment/cancel?booking_id=${booking._id}`,
-    custom_text: {
-      submit: {
-        message: trip
-          ? `Confirm payment for ${hotelName} + trip "${trip.title}"`
-          : `Confirm payment for your stay at ${hotelName}`,
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+          },
+          revenue: { $sum: "$totalPrice" },
+          bookings: { $sum: 1 },
+        },
       },
-    },
-    metadata: {
-      bookingId: booking._id.toString(),
-      userId: userId.toString(),
-      hotelName,
-      tripTitle: trip?.title || "",
-    },
-    payment_intent_data: {
-      metadata: {
-        bookingId: booking._id.toString(),
-        userId: userId.toString(),
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]),
+
+    // Booking trends by day of week
+    BookingModel.aggregate([
+      { $match: { createdAt: { $gte: startOfMonth } } },
+      {
+        $group: {
+          _id: { $dayOfWeek: "$createdAt" },
+          hotels: { $sum: 1 },
+          revenue: { $sum: "$totalPrice" },
+        },
       },
-      description: `Rahal booking — ${hotelName}${trip ? ` + ${trip.title}` : ""}`.slice(
-        0,
-        200
-      ),
-    },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          day: {
+            $arrayElemAt: [
+              ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+              { $subtract: ["$_id", 1] },
+            ],
+          },
+          hotels: 1,
+          revenue: 1,
+        },
+      },
+    ]),
+
+    // Top performing hotels by revenue
+    BookingModel.aggregate([
+      { $match: { status: { $in: ["confirmed", "completed"] } } },
+      {
+        $group: {
+          _id: "$hotel",
+          revenue: { $sum: "$totalPrice" },
+          bookings: { $sum: 1 },
+        },
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "hotels",
+          localField: "_id",
+          foreignField: "_id",
+          as: "hotel",
+        },
+      },
+      { $unwind: "$hotel" },
+      {
+        $project: {
+          _id: 0,
+          name: "$hotel.name",
+          city: "$hotel.city",
+          stars: "$hotel.stars",
+          coverImage: "$hotel.coverImage",
+          revenue: 1,
+          bookings: 1,
+        },
+      },
+    ]),
+  ]);
+
+  // بناء الـ 6 شهور كلها حتى لو فاضية
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
   });
 
-  booking.paymentStatus = "processing";
-  await booking.save();
-
-  return {
-    url: session.url,
-    sessionId: session.id,
-    amount,
-    currency: payCurrency,
-    bookingId: booking._id,
-  };
-};
-
-export const handleWebhookEvent = async (payload, sig) => {
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      payload,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+  const revenueByMonth = last6Months.map(({ year, month }) => {
+    const found = revenueByMonthRaw.find(
+      (r) => r._id?.year === year && r._id?.month === month,
     );
-  } catch (err) {
-    throw new ApiError(`Webhook signature verification failed: ${err.message}`, 400);
-  }
-
-  logger.info(`[Stripe] Booking webhook received: ${event.type}`);
-
-  switch (event.type) {
-    case "checkout.session.completed":
-      await fulfillBookingFromCheckout(event.data.object);
-      break;
-    case "payment_intent.succeeded":
-      await handleSuccessfulPayment(event.data.object);
-      break;
-    case "payment_intent.payment_failed":
-      await handleFailedPayment(event.data.object);
-      break;
-    case "charge.refunded":
-      await handleRefundedPayment(event.data.object);
-      break;
-    default:
-      console.log(`[Stripe] Unhandled booking event: ${event.type}`);
-  }
-
-  return { received: true };
-};
-
-const handleSuccessfulPayment = async (paymentIntent) => {
-  const bookingId = paymentIntent.metadata?.bookingId;
-  if (!bookingId) return;
-
-  const booking = await BookingModel.findById(bookingId);
-  if (!booking) {
-    console.warn(`[Stripe] Booking not found for payment ${paymentIntent.id}`);
-    return;
-  }
-
-  if (booking.paymentStatus === "succeeded") return;
-
-  booking.paymentStatus = "succeeded";
-  booking.paymentIntentId = paymentIntent.id;
-  booking.paymentMethod = paymentIntent.payment_method_types?.[0] || null;
-  booking.amountPaid = paymentIntent.amount / 100;
-  booking.currency = paymentIntent.currency?.toUpperCase() || booking.currency;
-  booking.paidAt = new Date(paymentIntent.created * 1000);
-  booking.status = "confirmed";
-  await booking.save();
-};
-
-const handleFailedPayment = async (paymentIntent) => {
-  const bookingId = paymentIntent.metadata?.bookingId;
-  if (!bookingId) return;
-
-  const booking = await BookingModel.findById(bookingId);
-  if (!booking) return;
-
-  booking.paymentStatus = "failed";
-  booking.paymentIntentId = paymentIntent.id;
-  if (paymentIntent.last_payment_error) {
-    booking.failureReason = paymentIntent.last_payment_error.message;
-  }
-  await booking.save();
-};
-
-const handleRefundedPayment = async (charge) => {
-  const booking = await BookingModel.findOne({
-    paymentIntentId: charge.payment_intent,
-  });
-  if (!booking) return;
-
-  booking.paymentStatus = "refunded";
-  booking.amountPaid = 0;
-  await booking.save();
-};
-
-export const getPaymentStatus = async (bookingId, userId) => {
-  const booking = await BookingModel.findById(bookingId);
-  if (!booking) {
-    throw new ApiError("Booking not found", 404);
-  }
-
-  if (booking.user.toString() !== userId.toString()) {
-    throw new ApiError("Not authorized to view this booking payment", 403);
-  }
-
-  return {
-    bookingId: booking._id,
-    paymentStatus: booking.paymentStatus,
-    amountPaid: booking.amountPaid,
-    currency: booking.currency,
-    paidAt: booking.paidAt,
-    failureReason: booking.failureReason || null,
-    bookingStatus: booking.status,
-  };
-};
-// Revenue====================
-export const getRevenueStats = async () => {
-  const bookings = await BookingModel.find();
-
-  let totalBookingRevenue = 0;
-
-  bookings.forEach((booking) => {
-    totalBookingRevenue += booking.totalPrice || 0;
-  });
-
-  const proSubscriptionsCount = await SubscriptionModel.countDocuments({
-    planName: "pro",
-  });
-
-  const proSubscriptionsRevenue = proSubscriptionsCount * 20;
-
-  return {
-    totalBookingRevenue,
-    proSubscriptionsRevenue,
-    totalRevenue:
-      totalBookingRevenue + proSubscriptionsRevenue,
-  };
-};
-// =====================Average Booking Price======
-export const getAverageBookingPrice = async () => {
-  const bookings = await BookingModel.find();
-
-  if (!bookings.length) {
+    const date = new Date(year, month - 1, 1);
     return {
-      averageBookingPrice: 0,
+      month: date.toLocaleString("en", { month: "short" }),
+      revenue: found?.revenue || 0,
+      bookings: found?.bookings || 0,
     };
-  }
-
-  let total = 0;
-
-  bookings.forEach((booking) => {
-    total += booking.totalPrice || 0;
   });
 
-  return {
-    averageBookingPrice: total / bookings.length,
-  };
-};
-// =====================Cancelled Bookings=====
-export const getCancelledBookingsCount = async () => {
-  const cancelledBookings = await BookingModel.countDocuments({
-    status: "canceled",
-  });
+  const thisMonthRevenue = revenueStats[0]?.total || 0;
+  const prevMonthRevenue = lastMonthRevenue[0]?.total || 0;
 
   return {
-    cancelledBookings,
+    totalBookings,
+    bookingsGrowth: calcGrowth(thisMonthBookings, lastMonthBookings),
+    totalRevenue: thisMonthRevenue,
+    revenueGrowth: calcGrowth(thisMonthRevenue, prevMonthRevenue),
+    byStatus,
+    revenueByMonth,
+    bookingTrends,
+    topHotels,
   };
 };

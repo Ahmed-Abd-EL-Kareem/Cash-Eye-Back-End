@@ -52,14 +52,6 @@ export const updateUser = asyncHandler(async (req, res) => {
 //   });
 // });
 
-export const changePassword = asyncHandler(async (req, res) => {
-  await userService.changePassword(req.user._id, req.body);
-
-  res.status(200).json({
-    status: "success",
-    message: "Password changed successfully",
-  });
-});
 
 export const deleteUser = asyncHandler(async (req, res) => {
   await userService.deleteUserById(req.params.id);
@@ -68,4 +60,10 @@ export const deleteUser = asyncHandler(async (req, res) => {
     status: "success",
     data: null,
   });
+});
+
+export const getUserStats = asyncHandler(async (req, res) => {
+  const stats = await userService.getUserStats();
+
+  res.status(200).json({ status: "success", data: stats });
 });

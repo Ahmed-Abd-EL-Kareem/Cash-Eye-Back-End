@@ -230,3 +230,11 @@ export const getRecommendations = asyncHandler(async (req, res) => {
     data: result,
   });
 });
+// GET /api/v1/ai/stats
+export const getAiStats = asyncHandler(async (req, res) => {
+  const data = await aiService.getAiStats();
+  successResponse(res, {
+    message: "AI stats fetched successfully",
+    data,
+  });
+});

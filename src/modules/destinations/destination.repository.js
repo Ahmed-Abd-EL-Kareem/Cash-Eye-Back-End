@@ -54,10 +54,10 @@ export const updateById = async (id, data) => {
 };
 
 // Soft delete — isActive:false, document stays in DB and Pinecone
-export const softDeleteById = async (id) => {
+export const softDeleteById = async (id,dest) => {
   return DestinationModel.findByIdAndUpdate(
     id,
-    { isActive: false },
+    { isActive: !dest.isActive },
     { new: true }
   ).lean();
 };

@@ -72,10 +72,6 @@
 //   });
 // });
 // ? /////////////////////////
-// trip.controller.js
-// Passes tokensUsed from generateAndSaveTrip into recordAIUsage
-// so tokensUsedThisMonth is accurately maintained in the subscription.
-
 import asyncHandler from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/apiError.js";
 import * as tripService from "./trip.service.js";
@@ -101,15 +97,22 @@ export const generateTrip = asyncHandler(async (req, res) => {
   if (!duration || isNaN(Number(duration)) || Number(duration) < 1)
     throw new ApiError("duration must be a positive number (days)", 400);
 
-  const result = await tripService.generateAndSaveTrip(req.user._id, {
-    destination: destination.trim(),
-    duration: Number(duration),
-    budget,
-    travelers: travelers ? Number(travelers) : 1,
-    interests,
-    language,
+  const result = await tripService.generateAndSaveTrip(
+    req.user._id,
+    {
+      destination: destination.trim(),
+      duration: Number(duration),
+      budget,
+      travelers: travelers ? Number(travelers) : 1,
+      interests,
+      language,
+      imageUrl,
+    }
+  );
+
+  await recordAIUsage(req.subscription, {
+    isTripGeneration: true,
   });
-  await recordAIUsage(req.subscription, { isTripGeneration: true });
 
   createdResponse(res, {
     message: "Trip generated successfully",
@@ -139,7 +142,9 @@ export const getTripById = asyncHandler(async (req, res) => {
 
 // PATCH /api/v1/trips/:id
 export const updateTrip = asyncHandler(async (req, res) => {
-  const trip = await tripService.updateTrip(req.params.id, req.user._id, req.body);
+  const trip = await tripService.updateTrip(
+    req.params.id, req.user._id, req.body,req.user.role
+  );
   successResponse(res, { message: "Trip updated successfully", data: trip });
 });
 
@@ -223,5 +228,13 @@ export const adminUpdateTrip = asyncHandler(async (req, res) => {
   successResponse(res, {
     message: "Trip updated successfully",
     data: trip,
+  });
+});
+
+export const getTripStats = asyncHandler(async (req, res) => {
+  const data = await tripService.getTripStats();
+  successResponse(res, {
+    message: "Trip stats fetched successfully",
+    data,
   });
 });

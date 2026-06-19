@@ -5,6 +5,7 @@ import * as UserController from "./user.controller.js";
 
 const router = express.Router();
 
+router.get("/stats", protect, restrictTo("admin"), UserController.getUserStats);
 router
   .route("/")
   .get(protect, UserController.getUsers)
@@ -16,5 +17,4 @@ router
   .patch(protect, UserController.updateUser)
   .delete(protect, UserController.deleteUser);
   
-  router.patch("/change-password", protect, UserController.changePassword);
 export default router;

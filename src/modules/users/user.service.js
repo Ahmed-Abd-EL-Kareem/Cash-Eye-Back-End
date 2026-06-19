@@ -79,3 +79,75 @@ export const deleteUserById = async (id) => {
   if (!user) throw new ApiError("No user found with this id", 404);
   return user;
 };
+
+export const getUserStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
+
+  const [
+    totalUsers,
+    totalUsersLastMonth,
+    thisMonthUsers,
+    lastMonthUsers,
+  ] = await Promise.all([
+    UserModel.countDocuments(),
+    UserModel.countDocuments({ createdAt: { $lte: endOfLastMonth } }),
+    UserModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
+    UserModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+  ]);
+
+  const [premiumCount, lastMonthPremiumCount] = await Promise.all([
+    UserModel.aggregate([
+      {
+        $lookup: {
+          from: "subscriptions",
+          localField: "subscription",
+          foreignField: "_id",
+          as: "sub",
+        },
+      },
+      { $unwind: "$sub" },
+      { $match: { "sub.status": { $in: ["active", "trialing"] } } },
+      { $count: "total" },
+    ]),
+    UserModel.aggregate([
+      {
+        $lookup: {
+          from: "subscriptions",
+          localField: "subscription",
+          foreignField: "_id",
+          as: "sub",
+        },
+      },
+      { $unwind: "$sub" },
+      {
+        $match: {
+          "sub.status": { $in: ["active", "trialing"] },
+          "sub.createdAt": { $gte: startOfLastMonth, $lte: endOfLastMonth },
+        },
+      },
+      { $count: "total" },
+    ]),
+  ]);
+
+  return {
+    totalUsers,
+    usersGrowth: calcGrowth(totalUsers, totalUsersLastMonth),
+    activeUsers: thisMonthUsers,
+    activeUsersGrowth: calcGrowth(thisMonthUsers, lastMonthUsers),
+    premiumUsers: premiumCount[0]?.total || 0,
+    premiumGrowth: calcGrowth(
+      premiumCount[0]?.total || 0,
+      lastMonthPremiumCount[0]?.total || 0
+    ),
+  };
+};
