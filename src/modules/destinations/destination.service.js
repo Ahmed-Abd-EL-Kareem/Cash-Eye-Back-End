@@ -2,7 +2,8 @@ import * as repo from "./destination.repository.js";
 import ApiError from "../../utils/apiError.js";
 import { indexDestination } from "../../integrations/ai/pinecone.rag.js";
 import logger from "../../config/logger.js";
-
+import DestinationModel from '../destinations/destination.model.js'
+import BookingModel from "../bookings/booking.model.js";
 // ─── Build MongoDB filter from query params ───────────────────────────────────
 const buildFilter = ({
   city,
@@ -163,4 +164,105 @@ export const getDestinationsByCity = async (city, limit = 5) => {
     limit,
     sort: { averageBudgetPerDay: 1 },
   });
+};
+export const getDestinationStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
+
+  const [
+    totalDestinations,
+    activeDestinations,
+    thisMonthDestinations,
+    lastMonthDestinations,
+    topDestinations,
+    byCategory,
+    byRegion,
+  ] = await Promise.all([
+    // Total
+    DestinationModel.countDocuments(),
+
+    // Active only
+    DestinationModel.countDocuments({ isActive: true }),
+
+    // Added this month
+    DestinationModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
+
+    // Added last month
+    DestinationModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+
+    // Top 3 destinations by averageBudgetPerDay (Trending)
+    DestinationModel.find({ isActive: true })
+      .sort({ averageBudgetPerDay: -1 })
+      .limit(3)
+      .select("name city coverImage images averageBudgetPerDay currency category"),
+
+    // Distribution by category
+    DestinationModel.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+
+    // Distribution by region
+    DestinationModel.aggregate([
+      { $match: { isActive: true, region: { $ne: null } } },
+      { $group: { _id: "$region", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  return {
+    total: totalDestinations,
+    active: activeDestinations,
+    inactive: totalDestinations - activeDestinations,
+    growth: calcGrowth(thisMonthDestinations, lastMonthDestinations),
+    topDestinations,
+    byCategory,
+    byRegion,
+  };
+};
+export const getTrendingDestinations = async (limit = 3) => {
+  const destinations = await repo.findAll({
+    filter: { isActive: true },
+    sort: { averageBudgetPerDay: -1 },
+    skip: 0,
+    limit: Math.min(50, Number(limit) || 3),
+  });
+
+  const cities = destinations.map((d) => d.city);
+
+  const bookingStats = await BookingModel.aggregate([
+    { $match: { status: { $in: ["confirmed", "completed"] } } },
+    {
+      $lookup: {
+        from: "hotels",
+        localField: "hotel",
+        foreignField: "_id",
+        as: "hotelInfo",
+      },
+    },
+    { $unwind: "$hotelInfo" },
+    { $match: { "hotelInfo.city": { $in: cities } } },
+    { $group: { _id: "$hotelInfo.city", bookings: { $sum: 1 } } },
+  ]);
+
+  const statsMap = new Map(bookingStats.map((s) => [s._id, s.bookings]));
+
+  return destinations.map((dest, index) => ({
+    rank: index + 1,
+    city: dest.city,
+    country: "Egypt",
+    bookings: statsMap.get(dest.city) || 0,
+    growth: 0,
+    image: dest.coverImage,
+  }));
 };

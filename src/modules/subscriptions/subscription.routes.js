@@ -61,13 +61,15 @@ router.get("/pay/status/:subscriptionId", subscriptionPaymentController.getSubsc
 
 router.use(restrictTo("admin"));
 
+
 // ── Admin routes ───────────────────────────────────────────────────────────────
 router.get("/admin/all", subscriptionController.adminGetAllSubscriptions);
 router.get("/admin/stats", subscriptionController.adminGetPlanStats);
-router.get("/admin/churn", subscriptionController.adminGetChurnStats);               // ← 
-router.get("/admin/expiring", subscriptionController.adminGetExpiringSubscriptions); // ← 
+router.get("/admin/dashboard-stats", subscriptionController.getSubscriptionStats);
+router.get("/admin/churn", subscriptionController.adminGetChurnStats);
+router.get("/admin/expiring", subscriptionController.adminGetExpiringSubscriptions);
 router.patch("/admin/user/:userId/plan", subscriptionController.adminChangePlan);
-router.patch("/admin/user/:userId/cancel", subscriptionController.adminCancelSubscription); // ← 
+router.patch("/admin/user/:userId/cancel", subscriptionController.adminCancelSubscription);
 
 // ── Admin: Plan CRUD ───────────────────────────────────────────────────────────
 router.post("/admin/plans", subscriptionController.createPlan);

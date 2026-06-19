@@ -88,3 +88,19 @@ export const deleteDestination = asyncHandler(async (req, res) => {
 
   successResponse(res, { message: "Destination deleted successfully" });
 });
+export const getDestinationStats = asyncHandler(async (req, res) => {
+  const stats = await destinationService.getDestinationStats();
+
+  successResponse(res, {
+    message: "Destination stats fetched successfully",
+    data: stats,
+  });
+});
+export const getTrendingDestinations = asyncHandler(async (req, res) => {
+  const destinations = await destinationService.getTrendingDestinations(req.query.limit);
+
+  successResponse(res, {
+    message: "Trending destinations fetched successfully",
+    data: { destinations },
+  });
+});

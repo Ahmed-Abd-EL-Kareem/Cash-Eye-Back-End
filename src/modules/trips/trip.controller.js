@@ -230,3 +230,10 @@ export const adminUpdateTrip = asyncHandler(async (req, res) => {
     data: trip,
   });
 });
+export const getTripStats = asyncHandler(async (req, res) => {
+  const data = await tripService.getTripStats();
+  successResponse(res, {
+    message: "Trip stats fetched successfully",
+    data,
+  });
+});

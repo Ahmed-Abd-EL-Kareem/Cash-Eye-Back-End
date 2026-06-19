@@ -216,3 +216,7 @@ export const cancelSubscription = asyncHandler(async (req, res) => {
   const sub = await subscriptionService.cancelSubscription(req.user._id);
   res.status(200).json({ status: "success", data: sub });
 });
+export const getSubscriptionStats = asyncHandler(async (req, res) => {
+  const stats = await subscriptionService.getSubscriptionStats();
+  res.status(200).json({ status: "success", data: stats });
+});

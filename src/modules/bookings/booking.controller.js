@@ -31,3 +31,11 @@ export const adminUpdateStatus = asyncHandler(async (req, res) => {
   const booking = await bookingService.adminUpdateStatus(req.params.id, req.body.status);
   successResponse(res, { message: "Booking status updated", data: booking });
 });
+export const getBookingStats = asyncHandler(async (req, res) => {
+  const stats = await bookingService.getBookingStats();
+
+  successResponse(res, {
+    message: "Booking stats fetched successfully",
+    data: stats,
+  });
+});

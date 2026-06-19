@@ -288,34 +288,55 @@ export const checkAndConsumeTokens = async (userId, tokensToUse) => {
 // Supports: ?status=active  ?planName=pro  ?search=ahmed
 //           ?sort=-createdAt  ?page=1  ?limit=10
 
+// export const getAllSubscriptions = async (query = {}) => {
+//   const filter = { user: { $ne: null } };
+
+//   const baseQuery = SubscriptionModel.find(filter)
+//     .populate("user", "name email")
+//     .populate("plan", "name displayName price limits");
+
+//   const features = new APIFeatures(SubscriptionModel, baseQuery, query)
+//     .filter()
+//     .search([])
+//     .sort()
+//     .paginate();
+
+//   const [subscriptions, total] = await Promise.all([
+//     features.query,
+//     SubscriptionModel.countDocuments(filter),
+//   ]);
+
+//   return {
+//     subscriptions,
+//     length: subscriptions.length,
+//     pagination: {
+//       total,
+//       page: features.page,
+//       limit: features.limit,
+//       pages: Math.ceil(total / features.limit),
+//     },
+//   };
+// };
+
 export const getAllSubscriptions = async (query = {}) => {
-  const baseQuery = SubscriptionModel.find()
+  const validUserIds = await UserModel.distinct('_id');
+  const filter = { user: { $in: validUserIds } };
+
+  const subscriptions = await SubscriptionModel.find(filter)
     .populate("user", "name email")
     .populate("plan", "name displayName price limits");
-
-  const features = new APIFeatures(SubscriptionModel, baseQuery, query)
-    .filter()
-    .search([])
-    .sort()
-    .paginate();
-
-  const [subscriptions, total] = await Promise.all([
-    features.query,
-    features.countDocuments(),
-  ]);
 
   return {
     subscriptions,
     length: subscriptions.length,
     pagination: {
-      total,
-      page: features.page,
-      limit: features.limit,
-      pages: Math.ceil(total / features.limit),
+      total: subscriptions.length,
+      page: 1,
+      limit: subscriptions.length,
+      pages: 1,
     },
   };
 };
-
 // ─── Admin: Get Expiring Subscriptions ────────────────────────────────────────
 
 export const getExpiringSubscriptions = async (days = 7) => {
@@ -339,14 +360,18 @@ export const expireSubscriptions = async () => {
 };
 
 // ─── Admin: Get Churn Stats ────────────────────────────────────────────────────
-
 export const getChurnStats = async () => {
-  const [total, canceled, past_due, active, free] = await Promise.all([
-    SubscriptionModel.countDocuments(),
-    SubscriptionModel.countDocuments({ status: "canceled" }),
-    SubscriptionModel.countDocuments({ status: "past_due" }),
-    SubscriptionModel.countDocuments({ status: "active" }),
-    SubscriptionModel.countDocuments({ status: "free" }),
+  // جيب الـ IDs الموجودين فعلاً في الـ users collection
+  const validUserIds = await UserModel.distinct('_id');
+  
+  const filter = { user: { $in: validUserIds } };
+  
+  const [total, active, free, canceled, past_due] = await Promise.all([
+    SubscriptionModel.countDocuments(filter),
+    SubscriptionModel.countDocuments({ ...filter, status: 'active' }),
+    SubscriptionModel.countDocuments({ ...filter, status: 'free' }),
+    SubscriptionModel.countDocuments({ ...filter, status: 'canceled' }),
+    SubscriptionModel.countDocuments({ ...filter, status: 'past_due' }),
   ]);
 
   return {
@@ -355,10 +380,7 @@ export const getChurnStats = async () => {
     free,
     canceled,
     past_due,
-    churnRate:
-      total > 0
-        ? (((canceled + past_due) / total) * 100).toFixed(2)
-        : "0.00",
+    churnRate: total > 0 ? ((canceled / total) * 100).toFixed(2) : '0.00',
   };
 };
 
@@ -456,4 +478,52 @@ export const adminCreateSubscription = async (userId, planName) => {
 
   await UserModel.findByIdAndUpdate(userId, { subscription: sub._id });
   return sub;
+};
+export const getSubscriptionStats = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const calcGrowth = (current, previous) => {
+    if (!previous) return 100;
+    return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+  };
+
+  const [tierStats, totalSubs, thisMonthSubs, lastMonthSubs] = await Promise.all([
+    // توزيع الـ tiers
+    SubscriptionModel.aggregate([
+      {
+        $group: {
+          _id: "$planName",
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // إجمالي الـ subscriptions
+    SubscriptionModel.countDocuments(),
+
+    // الشهر ده
+    SubscriptionModel.countDocuments({
+      createdAt: { $gte: startOfMonth },
+    }),
+
+    // الشهر اللي فات
+    SubscriptionModel.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+  ]);
+
+  const tiers = tierStats.map((tier) => ({
+    name: tier._id,
+    count: tier.count,
+    percentage: parseFloat(((tier.count / totalSubs) * 100).toFixed(1)),
+  }));
+
+  return {
+    total: totalSubs,
+    growth: calcGrowth(thisMonthSubs, lastMonthSubs),
+    tiers,
+  };
 };

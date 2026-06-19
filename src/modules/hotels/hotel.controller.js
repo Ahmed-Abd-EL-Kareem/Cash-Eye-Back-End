@@ -93,3 +93,20 @@ export const getHotelMeta = asyncHandler(async (req, res) => {
     data,
   });
 });
+
+export const getHotelStats = asyncHandler(async (req, res) => {
+  const stats = await hotelService.getHotelStats();
+
+  successResponse(res, {
+    message: "Hotel stats fetched successfully",
+    data: stats,
+  });
+});
+export const getTopHotels = asyncHandler(async (req, res) => {
+  const hotels = await hotelService.getTopHotels(req.query.limit);
+
+  successResponse(res, {
+    message: "Top hotels fetched successfully",
+    data: { hotels },
+  });
+});

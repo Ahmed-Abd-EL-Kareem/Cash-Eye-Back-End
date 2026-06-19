@@ -10,20 +10,37 @@ import { restrictTo } from "../../middleware/role.middleware.js";
 
 const router = Router();
 
-// ─── Public routes ────────────────────────────────────────────────────────────
-
-// IMPORTANT: specific string routes (/nearby, /slug/:slug) must come BEFORE
-// the wildcard param route (/:id), otherwise Express matches them as ObjectIds
-// and returns 400 "Invalid destination ID".
+// ─── Public routes ─────────────────────────────────────────
 router.get("/nearby", destinationController.getNearbyDestinations);
 router.get("/slug/:slug", destinationController.getDestinationBySlug);
+
+// ─── Admin-only specific routes (لازم قبل /:id) ────────────
+router.get(
+  "/admin/stats",
+  protect,
+  restrictTo("admin"),
+  destinationController.getDestinationStats
+);
+router.get(
+  "/trending",
+  protect,
+  restrictTo("admin"),
+  destinationController.getTrendingDestinations
+);
+
+// ─── باقي الـ public routes ─────────────────────────────────
 router.get("/", destinationController.getDestinations);
 router.get("/:id", validateObjectId, destinationController.getDestination);
 
-// ─── Admin only ───────────────────────────────────────────────────────────────
+// ─── Admin only (بعد /:id) ──────────────────────────────────
 router.use(protect, restrictTo("admin"));
 router.post("/", validateCreateDestination, destinationController.createDestination);
-router.patch("/:id", validateObjectId, validateUpdateDestination, destinationController.updateDestination);
+router.patch(
+  "/:id",
+  validateObjectId,
+  validateUpdateDestination,
+  destinationController.updateDestination
+);
 router.delete("/:id", validateObjectId, destinationController.deleteDestination);
 
 export default router;
