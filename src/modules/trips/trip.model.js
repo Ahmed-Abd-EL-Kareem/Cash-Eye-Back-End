@@ -100,7 +100,7 @@ const tripSchema = new mongoose.Schema(
       type: String,
       default: null,
       trim: true,
-      default:"https://pin.it/3dRXJfZFd",
+      default:"https://i.pinimg.com/1200x/21/93/01/219301815003836b4f46a5401a0b50d2.jpg",
     },
     duration: { type: Number, required: true, min: 1 },
 
