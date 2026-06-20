@@ -1,15 +1,16 @@
 import { Router } from "express";
-// import * as bookingPaymentController from "./bookingPayment.controller.js";
-import * as bookingPaymentController from "./booking.controller.js";
+
+// import * as bookingPaymentController from "./booking.controller.js";
 import { protect } from "../../middleware/auth.middleware.js";
 import { restrictTo } from "../../middleware/role.middleware.js";
+import * as bookingController from "./booking.controller.js";
 
 const router = Router();
 
 router.use(protect);
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
-router.get("/admin/stats", restrictTo("admin"), bookingController.getBookingStats); 
+// router.get("/admin/stats", restrictTo("admin"), bookingController.getBookingStats); 
 router.get("/admin/all", restrictTo("admin"), bookingController.adminGetAllBookings);
 router.patch("/admin/:id/status", restrictTo("admin"), bookingController.adminUpdateStatus);
 
