@@ -74,82 +74,19 @@ export const getMyBookings = async (userId, query) => {
 
 // ─── Get single booking (owner only) ─────────────────────────────────────────
 export const getBookingById = async (bookingId, userId) => {
-  const booking = await BookingModel.findOne({ _id: bookingId, user: userId })
+  const booking = await BookingModel.findOne({
+    _id: bookingId,
+    user: userId,
+  })
     .populate("hotel")
     .populate("trip", "title destination days");
 
-//   if (!booking) throw new ApiError("Booking not found", 404);
-//   return booking;
-// };
+  if (!booking) {
+    throw new ApiError("Booking not found", 404);
+  }
 
-// // ─── Cancel booking ───────────────────────────────────────────────────────────
-// export const cancelBooking = async (bookingId, userId) => {
-//   const booking = await BookingModel.findOne({ _id: bookingId, user: userId });
-//   if (!booking) throw new ApiError("Booking not found", 404);
-
-//   if (booking.status === "canceled")
-//     throw new ApiError("Booking is already canceled", 400);
-//   if (booking.status === "completed")
-//     throw new ApiError("Completed bookings cannot be canceled", 400);
-
-//   booking.status = "canceled";
-//   booking.canceledAt = new Date();
-//   await booking.save();
-//   return booking;
-// };
-
-// // ─── Admin: get all bookings ──────────────────────────────────────────────────
-// export const adminGetAllBookings = async (query) => {
-//   const features = new APIFeatures(
-//     BookingModel,
-//     BookingModel.find()
-//       .populate("user", "name email")
-//       .populate("hotel", "name city"),
-//     query
-//   ).filter().sort().paginate();
-
-//   const [bookings, total] = await Promise.all([
-//     features.query,
-//     features.countDocuments(),
-//   ]);
-
-//   return {
-//     bookings,
-//     pagination: {
-//       total,
-//       page: features.page,
-//       limit: features.limit,
-//       totalPages: Math.ceil(total / features.limit),
-//     },
-//   };
-// };
-
-// // ─── Admin: update booking status ─────────────────────────────────────────────
-// export const adminUpdateStatus = async (bookingId, status) => {
-//   const VALID = ["pending", "confirmed", "canceled", "completed"];
-//   if (!VALID.includes(status))
-//     throw new ApiError(`status must be one of: ${VALID.join(", ")}`, 400);
-
-//   const booking = await BookingModel.findByIdAndUpdate(
-//     bookingId,
-//     { status },
-//     { new: true, runValidators: true }
-//   );
-//   if (!booking) throw new ApiError("Booking not found", 404);
-//   return booking;
-// };
-// import stripe from "../../../utils/stripe.js";
-// import stripe from "../../utils/stripe.js";
-// import BookingModel from "../../bookings/booking.model.js";
-// import BookingModel from "./booking.model.js";
-
-// import UserModel from "../users/user.model.js";
-// import ApiError from "../../utils/apiError.js";
-// // import logger from "../../../config/logger.js";
-// import logger from "../../config/logger.js";
-// update==================
-// // import SubscriptionModel from "../../subscriptions/subscription.model.js";
-// import SubscriptionModel from "../subscriptions/subscription.model.js";
+  return booking;
+};
 
 const getPaymentIntentId = (session) => {
   const pi = session.payment_intent;

@@ -53,14 +53,14 @@ const safeJsonParse = (raw, fallback = {}) => {
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const State = Annotation.Root({
-  messages:    Annotation({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  messages: Annotation({ reducer: (a, b) => [...a, ...b], default: () => [] }),
   userMessage: Annotation({ reducer: (_, b) => b, default: () => "" }),
-  userId:      Annotation({ reducer: (_, b) => b, default: () => null }),
-  context:     Annotation({ reducer: (a, b) => ({ ...a, ...b }), default: () => ({}) }),
-  nextAgent:   Annotation({ reducer: (_, b) => b, default: () => "chat" }),
-  agentUsed:   Annotation({ reducer: (_, b) => b, default: () => null }),
-  reply:       Annotation({ reducer: (_, b) => b, default: () => null }),
-  tokensUsed:  Annotation({ reducer: (_, b) => b, default: () => 0 }),
+  userId: Annotation({ reducer: (_, b) => b, default: () => null }),
+  context: Annotation({ reducer: (a, b) => ({ ...a, ...b }), default: () => ({}) }),
+  nextAgent: Annotation({ reducer: (_, b) => b, default: () => "chat" }),
+  agentUsed: Annotation({ reducer: (_, b) => b, default: () => null }),
+  reply: Annotation({ reducer: (_, b) => b, default: () => null }),
+  tokensUsed: Annotation({ reducer: (_, b) => b, default: () => 0 }),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,9 +117,9 @@ async function chatNode(state) {
 // NODE: HOTEL SEARCH AGENT
 // Tool-calling loop: RAG → search_hotels → score_hotels → reply
 // ─────────────────────────────────────────────────────────────────────────────
-const hotelSearchTools   = [ragTool, searchHotelsTool, scoreHotelsTool];
+const hotelSearchTools = [ragTool, searchHotelsTool, scoreHotelsTool];
 const hotelSearchToolNode = new ToolNode(hotelSearchTools);
-const hotelSearchLLM     = structuredLLM.bindTools(hotelSearchTools);
+const hotelSearchLLM = structuredLLM.bindTools(hotelSearchTools);
 
 async function hotelSearchNode(state) {
   logger.info("[Hotel Search Agent] Processing search");
@@ -132,25 +132,47 @@ async function hotelSearchNode(state) {
     new HumanMessage(state.userMessage),
   ];
 
-  for (let i = 0; i < 4; i++) {
+  let tokensUsed = 0;
+
+  for (let i = 0; i < 5; i++) {
     const response = await hotelSearchLLM.invoke(messages);
     messages.push(response);
+    tokensUsed += response.usage_metadata?.total_tokens || 0;
 
     if (!response.tool_calls?.length) {
-      const tokensUsed = response.usage_metadata?.total_tokens || 0;
+      const raw = (response.content || "").trim();
+      // Guard: if the model just echoed raw JSON/array, force it to rephrase
+      if (raw.startsWith("{") || raw.startsWith("[")) {
+        messages.push(
+          new HumanMessage(
+            "Please summarise those hotels in a friendly, human-readable message — " +
+            "name, city, stars, price/night, top amenities. Do not output raw JSON."
+          )
+        );
+        continue;
+      }
       logger.info(`[Hotel Search Agent] Done — ${tokensUsed} tokens`);
-      return { agentUsed: "hotel_search", reply: response.content, tokensUsed };
+      return { agentUsed: "hotel_search", reply: raw, tokensUsed };
     }
 
     const toolResult = await hotelSearchToolNode.invoke({ messages });
     messages.push(...toolResult.messages);
   }
 
-  const last = messages[messages.length - 1];
+  // Loop exhausted — force one more call asking explicitly for a summary,
+  // never return a ToolMessage's raw content as the reply.
+  messages.push(
+    new HumanMessage(
+      "Please give a friendly summary of the hotels found so far, in plain language."
+    )
+  );
+  const recovery = await hotelSearchLLM.invoke(messages);
+  tokensUsed += recovery.usage_metadata?.total_tokens || 0;
+
   return {
     agentUsed: "hotel_search",
-    reply: last?.content || "Hotel search completed.",
-    tokensUsed: 0,
+    reply: recovery.content || "I found some hotels but had trouble summarising them — please try again.",
+    tokensUsed,
   };
 }
 
@@ -158,9 +180,9 @@ async function hotelSearchNode(state) {
 // NODE: RECOMMENDATIONS AGENT
 // Tool-calling loop: RAG → (trip ctx) → search_hotels → score_hotels → reply
 // ─────────────────────────────────────────────────────────────────────────────
-const recommendationTools    = [ragTool, getTripContextTool, searchHotelsTool, scoreHotelsTool];
-const recommendationToolNode  = new ToolNode(recommendationTools);
-const recommendationLLM      = chatLLM.bindTools(recommendationTools);
+const recommendationTools = [ragTool, getTripContextTool, searchHotelsTool, scoreHotelsTool];
+const recommendationToolNode = new ToolNode(recommendationTools);
+const recommendationLLM = chatLLM.bindTools(recommendationTools);
 
 async function recommendationsNode(state) {
   logger.info("[Recommendations Agent] Processing request");
@@ -195,25 +217,47 @@ async function recommendationsNode(state) {
     new HumanMessage(userPrompt),
   ];
 
-  for (let i = 0; i < 5; i++) {
+  let tokensUsed = 0;
+
+  for (let i = 0; i < 6; i++) {
     const response = await recommendationLLM.invoke(messages);
     messages.push(response);
+    tokensUsed += response.usage_metadata?.total_tokens || 0;
 
     if (!response.tool_calls?.length) {
-      const tokensUsed = response.usage_metadata?.total_tokens || 0;
+      const raw = (response.content || "").trim();
+      // Guard: if the model just echoed raw JSON/array from score_hotels, force a rephrase
+      if (raw.startsWith("{") || raw.startsWith("[")) {
+        messages.push(
+          new HumanMessage(
+            "Please explain those recommendations warmly in plain language — " +
+            "why each hotel fits, match score, price, key amenities. Do not output raw JSON."
+          )
+        );
+        continue;
+      }
       logger.info(`[Recommendations Agent] Done — ${tokensUsed} tokens`);
-      return { agentUsed: "recommendations", reply: response.content, tokensUsed };
+      return { agentUsed: "recommendations", reply: raw, tokensUsed };
     }
 
     const toolResult = await recommendationToolNode.invoke({ messages });
     messages.push(...toolResult.messages);
   }
 
-  const last = messages[messages.length - 1];
+  // Loop exhausted — force one more call asking explicitly for a summary,
+  // never return a ToolMessage's raw content as the reply.
+  messages.push(
+    new HumanMessage(
+      "Please give a friendly summary of your top hotel recommendations, in plain language."
+    )
+  );
+  const recovery = await recommendationLLM.invoke(messages);
+  tokensUsed += recovery.usage_metadata?.total_tokens || 0;
+
   return {
     agentUsed: "recommendations",
-    reply: last?.content || "Recommendations generated.",
-    tokensUsed: 0,
+    reply: recovery.content || "I found some recommendations but had trouble summarising them — please try again.",
+    tokensUsed,
   };
 }
 
@@ -221,21 +265,21 @@ async function recommendationsNode(state) {
 // BUILD GRAPH
 // ─────────────────────────────────────────────────────────────────────────────
 const graph = new StateGraph(State)
-  .addNode("supervisor",       supervisorNode)
-  .addNode("chat",             chatNode)
-  .addNode("hotel_search",     hotelSearchNode)
-  .addNode("recommendations",  recommendationsNode)
+  .addNode("supervisor", supervisorNode)
+  .addNode("chat", chatNode)
+  .addNode("hotel_search", hotelSearchNode)
+  .addNode("recommendations", recommendationsNode)
 
   .addEdge("__start__", "supervisor")
 
   .addConditionalEdges("supervisor", (s) => s.nextAgent || "chat", {
-    chat:            "chat",
-    hotel_search:    "hotel_search",
+    chat: "chat",
+    hotel_search: "hotel_search",
     recommendations: "recommendations",
   })
 
-  .addEdge("chat",            END)
-  .addEdge("hotel_search",    END)
+  .addEdge("chat", END)
+  .addEdge("hotel_search", END)
   .addEdge("recommendations", END);
 
 const chatMultiAgent = graph.compile();
@@ -257,9 +301,9 @@ export const chatWithRahal = async (messages) => {
 
   const result = await chatMultiAgent.invoke({
     userMessage: lastUser.content,
-    messages:    messages.slice(0, -1),
-    context:     {},
-    nextAgent:   "chat",
+    messages: messages.slice(0, -1),
+    context: {},
+    nextAgent: "chat",
   });
 
   return { reply: result.reply, tokensUsed: result.tokensUsed };
@@ -273,9 +317,9 @@ export const chatWithRahal = async (messages) => {
 export const searchHotels = async (query, context = {}) => {
   const result = await chatMultiAgent.invoke({
     userMessage: query,
-    messages:    [],
+    messages: [],
     context,
-    nextAgent:   "hotel_search",
+    nextAgent: "hotel_search",
   });
   return { reply: result.reply, tokensUsed: result.tokensUsed };
 };
@@ -289,9 +333,9 @@ export const getHotelRecommendations = async (userId, context = {}) => {
   const result = await chatMultiAgent.invoke({
     userMessage: "Recommend hotels for me",
     userId,
-    messages:    [],
+    messages: [],
     context,
-    nextAgent:   "recommendations",
+    nextAgent: "recommendations",
   });
   return { reply: result.reply, tokensUsed: result.tokensUsed };
 };
