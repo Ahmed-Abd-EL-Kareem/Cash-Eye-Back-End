@@ -16,7 +16,7 @@ class APIFeatures {
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt|ne|in|nin)\b/g, (match) => `$${match}`);
 
-    this.filterQuery = JSON.parse(queryStr);
+    this.filterQuery = JSON.parse(queryStr);    
     this.query = this.query.find(this.filterQuery);
     return this;
   }
