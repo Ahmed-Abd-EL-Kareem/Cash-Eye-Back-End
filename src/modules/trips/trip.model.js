@@ -111,7 +111,11 @@ const tripSchema = new mongoose.Schema(
     },
 
     travelers: { type: Number, default: 1, min: 1 },
-    interests: { type: [String], default: [] },
+    interests: {
+      type: [{
+        type: String,
+        lowercase: true
+      }], default: [] },
 
     // Itinerary from AI
     days: { type: [daySchema], default: [] },
