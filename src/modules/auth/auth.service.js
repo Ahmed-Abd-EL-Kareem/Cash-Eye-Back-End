@@ -184,5 +184,5 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
 export const googleCallback = asyncHandler(async (req, res) => {
   const token = generateToken(req.user._id);
   sendCookie(res, token);
-  res.redirect(process.env.CLIENT_URL);
+  res.redirect(`${process.env.CLIENT_URL}?token=${token}`);
 });
