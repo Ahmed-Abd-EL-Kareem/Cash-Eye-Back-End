@@ -485,7 +485,7 @@ export const handleWebhookEvent = async (payload, sig) => {
     event = stripe.webhooks.constructEvent(
       payload,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_WEBHOOK_SECRET_BOOKING
     );
   } catch (err) {
     throw new ApiError(`Webhook signature verification failed: ${err.message}`, 400);

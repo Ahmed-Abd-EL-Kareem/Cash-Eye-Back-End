@@ -222,8 +222,7 @@ export const handleSubscriptionWebhookEvent = async (payload, sig) => {
     event = stripe.webhooks.constructEvent(
       payload,
       sig,
-      process.env.STRIPE_SUBSCRIPTION_WEBHOOK_SECRET ||
-        process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_WEBHOOK_SECRET_SUBSCRIPTION
     );
   } catch (err) {
     throw new ApiError(`Webhook signature verification failed: ${err.message}`, 400);

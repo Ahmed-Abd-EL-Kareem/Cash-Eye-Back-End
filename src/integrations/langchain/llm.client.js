@@ -15,9 +15,9 @@ if (!process.env.OPENAI_API_KEY) {
 // ── Chat model (NVIDIA endpoint, OpenAI-compatible) ──────────────────────────
 // Used by every agent sub-graph.
 export const chatLLM = new ChatOpenAI({
-  model: "openai/gpt-oss-120b",
-  temperature: 0.6,
-  maxTokens: 1500,
+  model: "openai/gpt-oss-20b",
+  temperature: 0.4,
+  maxTokens: 800,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
@@ -26,9 +26,9 @@ export const chatLLM = new ChatOpenAI({
 
 // Stricter / faster variant for structured-output agents
 export const structuredLLM = new ChatOpenAI({
-  model: "openai/gpt-oss-120b",
-  temperature: 0.2,
-  maxTokens: 800,
+  model: "openai/gpt-oss-20b",
+  temperature: 0.0,
+  maxTokens: 400,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
@@ -37,9 +37,9 @@ export const structuredLLM = new ChatOpenAI({
 
 // Booking agent uses Llama — keeps JSON compliance higher
 export const bookingLLM = new ChatOpenAI({
-  model: "meta/llama-3.3-70b-instruct",
-  temperature: 0.3,
-  maxTokens: 1000,
+  model: "moonshotai/kimi-k2.6",
+  temperature: 0.2,
+  maxTokens: 700,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
@@ -48,14 +48,15 @@ export const bookingLLM = new ChatOpenAI({
 
 // Trip planner needs more tokens for full itineraries
 export const tripLLM = new ChatOpenAI({
-  model: "openai/gpt-oss-120b",
-  temperature: 0.7,
+  model: "moonshotai/kimi-k2.6",
+  temperature: 0.6,
   maxTokens: 3000,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
 });
+
 
 // ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
 // Used by the RAG retriever — NOT the chat models.

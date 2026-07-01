@@ -1,6 +1,6 @@
 import * as repo from "./destination.repository.js";
 import ApiError from "../../utils/apiError.js";
-import { indexDestination } from "../../integrations/ai/pinecone.rag.js";
+import { indexDestination } from "../../integrations/langchain/rag.retriever.js";
 import logger from "../../config/logger.js";
 import DestinationModel from '../destinations/destination.model.js'
 import BookingModel from "../bookings/booking.model.js";

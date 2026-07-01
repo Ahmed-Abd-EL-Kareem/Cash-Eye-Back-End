@@ -4,7 +4,7 @@
 
 import DestinationModel from "../modules/destinations/destination.model.js";
 import logger from "../config/logger.js";
-import { upsertDocuments, buildDestinationIndexDoc, normalizeSeedDoc } from "../integrations/ai/pinecone.rag.js";
+import { upsertDocuments, buildDestinationIndexDoc, normalizeSeedDoc } from "../integrations/langchain/rag.retriever.js";
 
 export const DESTINATIONS_DATA = [{
   "_id": {
