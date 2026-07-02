@@ -25,10 +25,17 @@ export const chatLLM = new ChatOpenAI({
 });
 
 // Stricter / faster variant for structured-output agents
+// Used by fieldExtractorNode (aiBookingConversation.js) to pull booking facts
+// (destination/dates/guests/etc) out of the user's message every turn.
+// gpt-oss-20b is a reasoning-style model — it spends completion tokens on
+// internal reasoning BEFORE writing the JSON. 400 was enough for short
+// messages but silently truncated (and lost) extraction on longer, more
+// detail-packed ones — the JSON never finished, safeJsonParse fell back to
+// {}, and nothing got merged into session.context. Raised for headroom.
 export const structuredLLM = new ChatOpenAI({
   model: "openai/gpt-oss-20b",
   temperature: 0.0,
-  maxTokens: 400,
+  maxTokens: 1200,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
@@ -38,8 +45,8 @@ export const structuredLLM = new ChatOpenAI({
 // Booking agent uses Llama — keeps JSON compliance higher
 export const bookingLLM = new ChatOpenAI({
   model: "moonshotai/kimi-k2.6",
-  temperature: 0.2,
-  maxTokens: 700,
+  temperature: 0.6,
+  maxTokens: 1500,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",

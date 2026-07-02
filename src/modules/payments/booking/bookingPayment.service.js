@@ -439,8 +439,8 @@ export const createBookingCheckoutSession = async (
         quantity: 1,
       },
     ],
-    success_url: `${process.env.FRONTEND_URL}/booking/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
-    cancel_url: `${process.env.FRONTEND_URL}/booking/payment/cancel?booking_id=${booking._id}`,
+    success_url: `${process.env.CLIENT_URL}/booking/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
+    cancel_url: `${process.env.CLIENT_URL}/booking/payment/cancel?booking_id=${booking._id}`,
     custom_text: {
       submit: {
         message: trip

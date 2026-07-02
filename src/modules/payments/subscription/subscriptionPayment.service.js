@@ -164,8 +164,8 @@ export const createSubscriptionCheckoutSession = async (userId, planName) => {
       },
     ],
     mode: "subscription",
-    success_url: `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.FRONTEND_URL}/subscription/cancel`,
+    success_url: `${process.env.CLIENT_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.CLIENT_URL}/subscription/cancel`,
     custom_text: {
       submit: {
         message: `${plan.displayName}: ${plan.limits.tokensPerMonth.toLocaleString()} tokens/mo · ${formatTripsLimit(plan.limits.tripsPerMonth)}`,
