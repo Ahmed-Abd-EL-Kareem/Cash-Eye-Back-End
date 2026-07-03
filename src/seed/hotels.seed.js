@@ -1,12 +1,12 @@
 // hotels.seed.js
 
 import HotelModel from "../modules/hotels/hotel.model.js";
+// src/seed/hotels.seed.js
 import {
   upsertDocuments,
   buildHotelIndexDoc,
   normalizeSeedDoc,
-} from "../integrations/ai/pinecone.rag.js";
-
+} from "../integrations/langchain/rag.retriever.js"; // was integrations/ai/pinecone.rag.js
 export const HOTELS_DATA = [{
   "_id": {
     "$oid": "6a22f13a2aff6e43a1ad3c6b"

@@ -3,6 +3,7 @@
 // All agents import from here — swap models in one place.
 
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import OpenAI from "openai";
 import logger from "../../config/logger.js";
 
 if (!process.env.NVIDIA_API_KEY) {
@@ -65,12 +66,45 @@ export const tripLLM = new ChatOpenAI({
 });
 
 
-// ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
+// // ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
+// // Used by the RAG retriever — NOT the chat models.
+// export const embeddings = new OpenAIEmbeddings({
+//   model: "baai/bge-m3",
+//   // model: "nvidia/nv-embedqa-e5-v5",
+//   apiKey: process.env.NVIDIA_API_KEY,
+//   configuration: {
+//     baseURL: "https://integrate.api.nvidia.com/v1",
+//   },
+// });
+
+// ── Embedding model (NVIDIA nv-embedqa-e5-v5, 1024-dim, matches the Upstash index) ──
 // Used by the RAG retriever — NOT the chat models.
-export const embeddings = new OpenAIEmbeddings({
-  model: "baai/bge-m3",
+//
+// nv-embedqa-e5-v5 is an asymmetric retrieval model: NVIDIA's API requires
+// `input_type` ("query" for search terms, "passage" for indexed documents)
+// or retrieval quality drops significantly. LangChain's OpenAIEmbeddings
+// wrapper doesn't expose that field, so we call the OpenAI-compatible
+// NVIDIA endpoint directly instead.
+
+const embeddingHttpClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY,
-  configuration: {
-    baseURL: "https://integrate.api.nvidia.com/v1",
-  },
+  baseURL: "https://integrate.api.nvidia.com/v1",
 });
+
+const EMBED_MODEL = "nvidia/nv-embedqa-e5-v5";
+
+/**
+ * @param {string} text
+ * @param {"query"|"passage"} inputType - "query" when embedding a search
+ *   query, "passage" when embedding a document being indexed.
+ */
+export const embedText = async (text, inputType = "query") => {
+  const response = await embeddingHttpClient.embeddings.create({
+    model: EMBED_MODEL,
+    input: text.slice(0, 8000),
+    input_type: inputType,
+    truncate: "NONE",
+    encoding_format: "float",
+  });
+  return response.data[0].embedding;
+};

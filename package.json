@@ -14,10 +14,11 @@
   "description": "",
   "dependencies": {
     "@langchain/langgraph": "^1.4.2",
-    "@langchain/openai": "^1.4.7",
+    "@langchain/openai": "^1.5.3",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@pinecone-database/pinecone": "^7.2.0",
+    "@upstash/vector": "^1.2.3",
     "axios": "^1.17.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
