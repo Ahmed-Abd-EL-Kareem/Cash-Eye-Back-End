@@ -82,6 +82,7 @@ coverage/
 *.env.production.local
 *.development.env
 *.md
+!README.md
 .env.example
 *.prettierrc
 *.kilo

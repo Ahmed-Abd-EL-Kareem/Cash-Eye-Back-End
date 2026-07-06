@@ -49,6 +49,8 @@ export const bookingLLM = new ChatOpenAI({
   temperature: 0.6,
   maxTokens: 1500,
   apiKey: process.env.NVIDIA_API_KEY,
+  maxRetries: 4,        // langchain will retry on 429/5xx with backoff
+  timeout: 30_000,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
