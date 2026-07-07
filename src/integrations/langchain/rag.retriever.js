@@ -421,3 +421,26 @@ export const buildDestinationIndexDoc = (doc) => {
 
 export const indexHotel = (doc) => upsertDocuments([buildHotelIndexDoc(doc)]);
 export const indexDestination = (doc) => upsertDocuments([buildDestinationIndexDoc(doc)]);
+
+// ─── Remove documents from Upstash by id ─────────────────────────────────────
+// ids: Array<string> — full vector ids, e.g. ["hotel_507f...", "dest_507f..."]
+export const deleteDocuments = async (ids = []) => {
+  const index = getUpstashIndex();
+  if (!index) {
+    logger.warn("[RAG] Upstash not configured — skipping delete");
+    return false;
+  }
+  if (!ids.length) return false;
+
+  try {
+    await index.delete(ids);
+    logger.info(`[RAG] Deleted ${ids.length} vector(s) from Upstash: ${ids.join(", ")}`);
+    return true;
+  } catch (err) {
+    logger.error(`[RAG] Delete failed: ${err.message}`);
+    return false;
+  }
+};
+
+export const removeHotelIndex = (id) => deleteDocuments([`hotel_${normalizeDocId(id)}`]);
+export const removeDestinationIndex = (id) => deleteDocuments([`dest_${normalizeDocId(id)}`]);

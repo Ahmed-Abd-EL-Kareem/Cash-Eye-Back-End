@@ -241,10 +241,11 @@
 // };
 import * as repo from "./hotel.repository.js";
 import ApiError from "../../utils/apiError.js";
-import { indexHotel } from "../../integrations/langchain/rag.retriever.js";
 import logger from "../../config/logger.js";
 import HotelModel from "./hotel.model.js";
 import BookingModel from "../bookings/booking.model.js";
+import { indexHotel, removeHotelIndex } from "../../integrations/langchain/rag.retriever.js";
+
 const buildFilter = ({ city, stars, minPrice, maxPrice, search } = {}) => {
   const filter = { isActive: true };
 
@@ -363,10 +364,19 @@ export const updateHotel = async (id, data) => {
   return repo.updateById(id, data);
 };
 
+// export const deleteHotel = async (id) => {
+//   const hotel = await repo.findById(id);
+//   if (!hotel) throw new ApiError("Hotel not found", 404);
+//   await repo.softDeleteById(id);
+// };
 export const deleteHotel = async (id) => {
   const hotel = await repo.findById(id);
   if (!hotel) throw new ApiError("Hotel not found", 404);
   await repo.softDeleteById(id);
+
+  removeHotelIndex(id)
+    .then((ok) => ok && logger.info(`[RAG] Removed hotel ${id} from Upstash`))
+    .catch((err) => logger.warn(`[RAG] Failed to remove hotel ${id}: ${err.message}`));
 };
 
 export const getHotelMeta = async () => {

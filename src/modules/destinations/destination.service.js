@@ -1,6 +1,7 @@
 import * as repo from "./destination.repository.js";
 import ApiError from "../../utils/apiError.js";
-import { indexDestination } from "../../integrations/langchain/rag.retriever.js";
+import { indexDestination, removeDestinationIndex } from "../../integrations/langchain/rag.retriever.js";
+
 import logger from "../../config/logger.js";
 import DestinationModel from '../destinations/destination.model.js'
 import BookingModel from "../bookings/booking.model.js";
@@ -151,12 +152,28 @@ export const updateDestination = async (id, data) => {
 };
 
 // ─── Soft delete ──────────────────────────────────────────────────────────────
+// export const deleteDestination = async (id) => {
+//   const dest = await repo.findById(id);
+//   if (!dest) throw new ApiError("Destination not found", 404);
+//   await repo.softDeleteById(id,dest);
+// };
 export const deleteDestination = async (id) => {
   const dest = await repo.findById(id);
   if (!dest) throw new ApiError("Destination not found", 404);
-  await repo.softDeleteById(id,dest);
-};
 
+  const updated = await repo.softDeleteById(id, dest);
+
+  if (updated.isActive === false) {
+    removeDestinationIndex(id)
+      .then((ok) => ok && logger.info(`[RAG] Removed destination ${id} from Upstash`))
+      .catch((err) => logger.warn(`[RAG] Failed to remove destination ${id}: ${err.message}`));
+  } else {
+    // Reactivated — put it back
+    indexDestination(updated)
+      .then(() => logger.info(`[RAG] Re-indexed destination ${id} in Upstash`))
+      .catch((err) => logger.warn(`[RAG] Failed to re-index destination ${id}: ${err.message}`));
+  }
+};
 // ─── Internal: get destinations by city ──────────────────────────────────────
 export const getDestinationsByCity = async (city, limit = 5) => {
   return repo.findAll({
