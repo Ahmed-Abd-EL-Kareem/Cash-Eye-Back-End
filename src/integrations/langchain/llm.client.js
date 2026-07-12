@@ -43,24 +43,23 @@ export const structuredLLM = new ChatOpenAI({
   },
 });
 
-// Booking agent uses Llama — keeps JSON compliance higher
+// Fastest reliable option — small dense model, low latency, high throughput
 export const bookingLLM = new ChatOpenAI({
-  model: "meta/llama-3.3-70b-instruct",
-  temperature: 0.6,
-  maxTokens: 1500,
+  model: "meta/llama-3.1-8b-instruct",
+  temperature: 0.5,
+  maxTokens: 1000,
   apiKey: process.env.NVIDIA_API_KEY,
-  maxRetries: 4,
-  timeout: 30_000,
+  maxRetries: 3,
+  timeout: 15_000,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
 });
 
-// Trip planner needs more tokens for full itineraries
 export const tripLLM = new ChatOpenAI({
-  model: "meta/llama-3.3-70b-instruct",
+  model: "meta/llama-3.1-8b-instruct",
   temperature: 0.6,
-  maxTokens: 3000,
+  maxTokens: 2500,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
