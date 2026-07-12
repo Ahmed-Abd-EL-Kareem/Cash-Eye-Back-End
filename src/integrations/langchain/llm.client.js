@@ -45,11 +45,11 @@ export const structuredLLM = new ChatOpenAI({
 
 // Booking agent uses Llama — keeps JSON compliance higher
 export const bookingLLM = new ChatOpenAI({
-  model: "moonshotai/kimi-k2.6",
+  model: "meta/llama-3.3-70b-instruct",
   temperature: 0.6,
   maxTokens: 1500,
   apiKey: process.env.NVIDIA_API_KEY,
-  maxRetries: 4,        // langchain will retry on 429/5xx with backoff
+  maxRetries: 4,
   timeout: 30_000,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
@@ -58,7 +58,7 @@ export const bookingLLM = new ChatOpenAI({
 
 // Trip planner needs more tokens for full itineraries
 export const tripLLM = new ChatOpenAI({
-  model: "moonshotai/kimi-k2.6",
+  model: "meta/llama-3.3-70b-instruct",
   temperature: 0.6,
   maxTokens: 3000,
   apiKey: process.env.NVIDIA_API_KEY,
@@ -66,7 +66,6 @@ export const tripLLM = new ChatOpenAI({
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
 });
-
 
 // // ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
 // // Used by the RAG retriever — NOT the chat models.
