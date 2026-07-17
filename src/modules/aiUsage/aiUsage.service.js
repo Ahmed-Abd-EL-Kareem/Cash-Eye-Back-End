@@ -80,3 +80,39 @@ export const getMostUsedModels = async () => {
 export const getTopDestinations = async (limit) => {
   return repo.getTopDestinations(limit);
 };
+
+/**
+ * List AI usage logs with filtering and pagination
+ * @param {Object} options
+ * @param {number} options.page
+ * @param {number} options.limit
+ * @param {string} options.feature
+ * @param {string} options.userId
+ * @param {string} options.status
+ * @param {string} options.from
+ * @param {string} options.to
+ * @returns {Promise<Object>}
+ */
+export const listUsage = async ({ page = 1, limit = 20, feature, userId, status, from, to }) => {
+  return repo.listUsage({ page, limit, feature, userId, status, from, to });
+};
+
+/**
+ * Get AI usage statistics aggregated by feature
+ * @param {Object} options
+ * @param {string} options.from
+ * @param {string} options.to
+ * @returns {Promise<Array>}
+ */
+export const getUsageStats = async ({ from, to }) => {
+  return repo.getUsageStats({ from, to });
+};
+
+/**
+ * Get a single AI usage log by ID
+ * @param {string} id
+ * @returns {Promise<Object|null>}
+ */
+export const getUsageById = async (id) => {
+  return repo.getUsageById(id);
+};

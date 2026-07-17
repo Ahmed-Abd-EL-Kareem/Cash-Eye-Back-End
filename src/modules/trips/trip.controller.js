@@ -112,6 +112,7 @@ export const generateTrip = asyncHandler(async (req, res) => {
 
   await recordAIUsage(req.subscription, {
     isTripGeneration: true,
+    tokensUsed: result.tokensUsed || 0,
   });
 
   createdResponse(res, {

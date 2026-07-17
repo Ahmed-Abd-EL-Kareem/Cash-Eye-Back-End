@@ -6,6 +6,17 @@ const aiUsageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "User is required"],
+      index: true,
+    },
+    feature: {
+      type: String,
+      enum: ["chat", "bookingConversation", "hotelAiSearch", "recommendations", "tripPlanner"],
+      required: true,
+      index: true,
+    },
+    sessionId: {
+      type: String,
+      index: true,
     },
     trip: {
       type: mongoose.Schema.Types.ObjectId,
@@ -33,13 +44,14 @@ const aiUsageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    responseTime: {
-      type: Number, // In milliseconds
-      required: [true, "Response time is required"],
+    latencyMs: {
+      type: Number,
     },
-    success: {
-      type: Boolean,
-      default: true,
+    status: {
+      type: String,
+      enum: ["success", "error"],
+      default: "success",
+      index: true,
     },
     errorMessage: {
       type: String,
@@ -56,6 +68,9 @@ const aiUsageSchema = new mongoose.Schema(
 
 // Compound index for querying user usage sorted by date
 aiUsageSchema.index({ user: 1, createdAt: -1 });
+
+// Index for filtering by feature and date
+aiUsageSchema.index({ feature: 1, createdAt: -1 });
 
 // Single indexes for filtering and statistics
 aiUsageSchema.index({ model: 1 });

@@ -88,3 +88,4 @@ coverage/
 *.kilo
 *.opencode
 Rahal_API_Postman_Collection.json
+*.txt

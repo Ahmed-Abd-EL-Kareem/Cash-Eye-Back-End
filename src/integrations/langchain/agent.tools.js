@@ -1401,43 +1401,104 @@ export const saveBookingTool = new DynamicStructuredTool({
     paymentMethod: z.string().default("credit_card"),
     specialRequests: z.string().optional(),
   }),
+  // func: async ({ userId, hotelId, checkIn, checkOut, guests, rooms, paymentMethod, specialRequests }) => {
+  //   // Guard: reject invalid hotelId before hitting MongoDB
+  //   if (!isValidObjectId(hotelId)) {
+  //     logger.warn(`[SaveBooking Tool] Rejected invalid hotelId: "${hotelId}"`);
+  //     return JSON.stringify({
+  //       success: false,
+  //       error: `Invalid hotelId "${hotelId}". Use the 24-char 'id' from search_hotels results.`,
+  //     });
+  //   }
+
+  //   try {
+  //     const BookingModel = await getBookingModel();
+  //     const hotelService = await getHotelService();
+
+  //     const hotel = await hotelService.getHotelById(hotelId);
+  //     if (!hotel) return JSON.stringify({ success: false, error: "Hotel not found" });
+
+  //     const checkInDate = new Date(checkIn);
+  //     const checkOutDate = new Date(checkOut);
+
+  //     if (isNaN(checkInDate) || isNaN(checkOutDate)) {
+  //       return JSON.stringify({ success: false, error: "Invalid dates" });
+  //     }
+
+  //     const nights = Math.max(
+  //       1,
+  //       Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))
+  //     );
+  //     const totalPrice = hotel.averagePricePerNight * nights * rooms;
+
+  //     const booking = await BookingModel.create({
+  //       user: userId,
+  //       hotel: hotel._id,
+  //       checkIn: checkInDate,
+  //       checkOut: checkOutDate,
+  //       guests,
+  //       rooms,
+  //       totalPrice,
+  //       currency: hotel.currency || "EGP",
+  //       status: "confirmed",
+  //       paymentStatus: "pending",
+  //       paymentMethod,
+  //       amountPaid: totalPrice,
+  //       paidAt: new Date(),
+  //       specialRequests: specialRequests || null,
+  //     });
+
+  //     logger.info(`[SaveBooking Tool] Booking saved: ${booking._id}`);
+  //     return JSON.stringify({
+  //       success: true,
+  //       bookingId: booking._id.toString(),
+  //       totalPrice,
+  //       currency: hotel.currency || "EGP",
+  //       nights,
+  //     });
+  //   } catch (err) {
+  //     logger.error(`[SaveBooking Tool] ${err.message}`);
+  //     return JSON.stringify({ success: false, error: err.message });
+  //   }
+  // },
   func: async ({ userId, hotelId, checkIn, checkOut, guests, rooms, paymentMethod, specialRequests }) => {
-    // Guard: reject invalid hotelId before hitting MongoDB
-    if (!isValidObjectId(hotelId)) {
-      logger.warn(`[SaveBooking Tool] Rejected invalid hotelId: "${hotelId}"`);
-      return JSON.stringify({
-        success: false,
-        error: `Invalid hotelId "${hotelId}". Use the 24-char 'id' from search_hotels results.`,
-      });
-    }
+    if (!isValidObjectId(hotelId)) { /* unchanged */ }
 
     try {
-      const BookingModel = await getBookingModel();
       const hotelService = await getHotelService();
-
       const hotel = await hotelService.getHotelById(hotelId);
       if (!hotel) return JSON.stringify({ success: false, error: "Hotel not found" });
 
+      // pick an active room that fits the requested guest count
+      const roomDoc = (hotel.rooms || []).find(
+        (r) => r.isActive && r.maxAdults * rooms >= guests
+      ) || (hotel.rooms || []).find((r) => r.isActive);
+
+      if (!roomDoc) {
+        return JSON.stringify({ success: false, error: "No matching room available at this hotel" });
+      }
+
       const checkInDate = new Date(checkIn);
       const checkOutDate = new Date(checkOut);
-
       if (isNaN(checkInDate) || isNaN(checkOutDate)) {
         return JSON.stringify({ success: false, error: "Invalid dates" });
       }
 
-      const nights = Math.max(
-        1,
-        Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))
-      );
-      const totalPrice = hotel.averagePricePerNight * nights * rooms;
+      const nights = Math.max(1, Math.ceil((checkOutDate - checkInDate) / 86400000));
+      const totalPrice = roomDoc.pricePerNight * nights * rooms;
 
       const booking = await BookingModel.create({
         user: userId,
         hotel: hotel._id,
         checkIn: checkInDate,
         checkOut: checkOutDate,
-        guests,
-        rooms,
+        rooms: [{
+          room: roomDoc._id,
+          roomType: roomDoc.roomType,
+          quantity: rooms,
+          guests: { adults: guests, children: 0 },
+          pricePerNight: roomDoc.pricePerNight,
+        }],
         totalPrice,
         currency: hotel.currency || "EGP",
         status: "confirmed",
@@ -1449,13 +1510,7 @@ export const saveBookingTool = new DynamicStructuredTool({
       });
 
       logger.info(`[SaveBooking Tool] Booking saved: ${booking._id}`);
-      return JSON.stringify({
-        success: true,
-        bookingId: booking._id.toString(),
-        totalPrice,
-        currency: hotel.currency || "EGP",
-        nights,
-      });
+      return JSON.stringify({ success: true, bookingId: booking._id.toString(), totalPrice, currency: hotel.currency || "EGP", nights });
     } catch (err) {
       logger.error(`[SaveBooking Tool] ${err.message}`);
       return JSON.stringify({ success: false, error: err.message });

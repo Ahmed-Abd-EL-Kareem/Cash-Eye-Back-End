@@ -15,6 +15,53 @@ export const createUsage = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/ai-usage
+ * List AI usage logs with filtering and pagination
+ */
+export const listUsage = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 20,
+    feature,
+    userId,
+    status,
+    from,
+    to,
+  } = req.query;
+
+  // Cap limit at 100
+  const cappedLimit = Math.min(Number(limit), 100);
+
+  const result = await aiUsageService.listUsage({
+    page: Number(page),
+    limit: cappedLimit,
+    feature,
+    userId,
+    status,
+    from,
+    to,
+  });
+
+  successResponse(res, {
+    message: "AI usage logs fetched successfully",
+    data: result,
+  });
+});
+
+/**
+ * GET /api/v1/ai-usage/stats
+ * Get AI usage statistics aggregated by feature
+ */
+export const getUsageStats = asyncHandler(async (req, res) => {
+  const { from, to } = req.query;
+  const stats = await aiUsageService.getUsageStats({ from, to });
+  successResponse(res, {
+    message: "AI usage stats fetched successfully",
+    data: stats,
+  });
+});
+
+/**
  * GET /api/v1/ai-usage/dashboard
  * Retrieve overall AI usage metrics and dashboard indicators
  */
@@ -23,6 +70,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
   successResponse(res, {
     message: "AI usage dashboard stats fetched successfully",
     data: stats,
+  });
+});
+
+/**
+ * GET /api/v1/ai-usage/:id
+ * Retrieve a single AI usage log by ID
+ */
+export const getUsageById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const usage = await aiUsageService.getUsageById(id);
+
+  if (!usage) {
+    return res.status(404).json({
+      status: "error",
+      message: "AI usage log not found",
+    });
+  }
+
+  successResponse(res, {
+    message: "AI usage log fetched successfully",
+    data: usage,
   });
 });
 

@@ -8,9 +8,7 @@ import {
   normalizeSeedDoc,
 } from "../integrations/langchain/rag.retriever.js"; // was integrations/ai/pinecone.rag.js
 export const HOTELS_DATA = [{
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c6b"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c6b",
   "name": {
     "en": "Four Seasons Hotel Cairo at Nile Plaza",
     "ar": "فور سيزونز القاهرة نايل بلازا"
@@ -36,47 +34,69 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "single",
-      "pricePerNight": 8500,
-      "capacity": 1
-    },
-    {
-      "type": "double",
+      "name": "Deluxe Nile View",
+      "nameAr": "ديلوكس بإطلالة على النيل",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 20,
       "pricePerNight": 12000,
-      "capacity": 2
+      "amenities": ["Nile View", "Free WiFi", "Minibar", "Bathrobe"],
+      "images": ["https://images.unsplash.com/photo-1566073771259-6a8506099945"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Executive Suite",
+      "nameAr": "جناح تنفيذي",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 8,
       "pricePerNight": 22000,
-      "capacity": 4
+      "amenities": ["Nile View", "Living Room", "Free WiFi", "Minibar", "Bathrobe", "Butler Service"],
+      "images": ["https://images.unsplash.com/photo-1551882547-ff40c63fe5fa"],
+      "isActive": true
+    },
+    {
+      "name": "Presidential Suite",
+      "nameAr": "جناح رئاسي",
+      "roomType": "suite",
+      "maxAdults": 4,
+      "maxChildren": 2,
+      "totalUnits": 2,
+      "pricePerNight": 45000,
+      "amenities": ["Panoramic Nile View", "2 Bedrooms", "Living Room", "Dining Room", "Kitchenette", "Free WiFi", "Butler Service", "Private Elevator"],
+      "images": ["https://images.unsplash.com/photo-1566073771259-6a8506099945"],
+      "isActive": true
+    },
+    {
+      "name": "Family Room - Nile View",
+      "nameAr": "غرفة عائلية بإطلالة على النيل",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 10,
+      "pricePerNight": 18000,
+      "amenities": ["Nile View", "Connecting Rooms Available", "Free WiFi", "Extra Bed"],
+      "images": [],
+      "isActive": true
     }
   ],
-  "averagePricePerNight": 14166,
+  "averagePricePerNight": 24250,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      31.2296,
-      30.0444
-    ]
+    "coordinates": [31.2296, 30.0444]
   },
   "images": [
     "https://images.unsplash.com/photo-1566073771259-6a8506099945",
     "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa"
   ],
   "coverImage": "https://images.unsplash.com/photo-1566073771259-6a8506099945",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.590Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.590Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c6c"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c6c",
   "name": {
     "en": "Kempinski Nile Hotel Cairo",
     "ar": "فندق كمبنسكي نايل القاهرة"
@@ -102,47 +122,57 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "single",
-      "pricePerNight": 7000,
-      "capacity": 1
-    },
-    {
-      "type": "double",
+      "name": "Premier Room",
+      "nameAr": "غرفة بريمير",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 30,
       "pricePerNight": 10500,
-      "capacity": 2
+      "amenities": ["City View", "Free WiFi", "Minibar", "Work Desk"],
+      "images": ["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Executive Suite",
+      "nameAr": "جناح تنفيذي",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 10,
       "pricePerNight": 18000,
-      "capacity": 4
+      "amenities": ["Nile View", "Living Area", "Free WiFi", "Minibar", "Bathrobe"],
+      "images": ["https://images.unsplash.com/photo-1496417263034-38ec4f0b665a"],
+      "isActive": true
+    },
+    {
+      "name": "Family Connecting Rooms",
+      "nameAr": "غرف عائلية متصلة",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 15,
+      "pricePerNight": 16000,
+      "amenities": ["City View", "Connecting Doors", "Free WiFi", "Extra Bed"],
+      "images": [],
+      "isActive": true
     }
   ],
-  "averagePricePerNight": 11833,
+  "averagePricePerNight": 14833,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      31.2238,
-      30.0443
-    ]
+    "coordinates": [31.2238, 30.0443]
   },
   "images": [
     "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
     "https://images.unsplash.com/photo-1496417263034-38ec4f0b665a"
   ],
   "coverImage": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.591Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.591Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c6d"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c6d",
   "name": {
     "en": "Four Seasons Hotel Alexandria at San Stefano",
     "ar": "فندق فور سيزونز الإسكندرية سان ستيفانو"
@@ -168,46 +198,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Sea View Room",
+      "nameAr": "غرفة بإطلالة بحرية",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 25,
       "pricePerNight": 9000,
-      "capacity": 2
+      "amenities": ["Sea View", "Balcony", "Free WiFi", "Minibar"],
+      "images": ["https://images.unsplash.com/photo-1494526585095-c41746248156"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Deluxe Suite",
+      "nameAr": "جناح ديلوكس",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 8,
       "pricePerNight": 17000,
-      "capacity": 4
+      "amenities": ["Panoramic Sea View", "Living Room", "Free WiFi", "Bathrobe", "Minibar"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Suite",
+      "nameAr": "جناح عائلي",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 6,
       "pricePerNight": 21000,
-      "capacity": 5
+      "amenities": ["Sea View", "2 Bedrooms", "Living Area", "Free WiFi", "Extra Beds"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 15666,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      31.198,
-      29.9335
-    ]
+    "coordinates": [31.198, 29.9335]
   },
   "images": [
     "https://images.unsplash.com/photo-1494526585095-c41746248156"
   ],
   "coverImage": "https://images.unsplash.com/photo-1494526585095-c41746248156",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c6e"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c6e",
   "name": {
     "en": "Sofitel Winter Palace Luxor",
     "ar": "سوفيتيل وينتر بالاس الأقصر"
@@ -232,46 +272,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "single",
-      "pricePerNight": 5000,
-      "capacity": 1
-    },
-    {
-      "type": "double",
+      "name": "Classic Room - Garden View",
+      "nameAr": "غرفة كلاسيكية بإطلالة على الحديقة",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 40,
       "pricePerNight": 8000,
-      "capacity": 2
+      "amenities": ["Garden View", "Free WiFi", "Minibar"],
+      "images": ["https://images.unsplash.com/photo-1582719508461-905c673771fd"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Nile View Suite",
+      "nameAr": "جناح بإطلالة على النيل",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 12,
       "pricePerNight": 15000,
-      "capacity": 4
+      "amenities": ["Nile View", "Living Area", "Free WiFi", "Bathrobe", "Minibar"],
+      "images": [],
+      "isActive": true
+    },
+    {
+      "name": "Royal Suite",
+      "nameAr": "جناح ملكي",
+      "roomType": "suite",
+      "maxAdults": 4,
+      "maxChildren": 2,
+      "totalUnits": 3,
+      "pricePerNight": 35000,
+      "amenities": ["Panoramic Nile View", "2 Bedrooms", "Dining Room", "Living Room", "Butler Service", "Free WiFi"],
+      "images": [],
+      "isActive": true
     }
   ],
-  "averagePricePerNight": 9333,
+  "averagePricePerNight": 19333,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      32.6396,
-      25.6872
-    ]
+    "coordinates": [32.6396, 25.6872]
   },
   "images": [
     "https://images.unsplash.com/photo-1582719508461-905c673771fd"
   ],
   "coverImage": "https://images.unsplash.com/photo-1582719508461-905c673771fd",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c6f"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c6f",
   "name": {
     "en": "Sofitel Legend Old Cataract Aswan",
     "ar": "سوفيتيل ليجند أولد كتاراكت أسوان"
@@ -296,46 +346,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Palace Room - Nile View",
+      "nameAr": "غرفة القصر بإطلالة على النيل",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 20,
       "pricePerNight": 9500,
-      "capacity": 2
+      "amenities": ["Nile View", "Free WiFi", "Minibar", "Bathrobe"],
+      "images": ["https://images.unsplash.com/photo-1532634896-26909d0d0d8b"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Cataract Suite",
+      "nameAr": "جناح كتاراكت",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 8,
       "pricePerNight": 18000,
-      "capacity": 4
+      "amenities": ["Panoramic Nile View", "Living Room", "Free WiFi", "Butler Service", "Bathrobe"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Suite",
+      "nameAr": "جناح عائلي",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 5,
       "pricePerNight": 22000,
-      "capacity": 5
+      "amenities": ["Nile View", "2 Bedrooms", "Living Area", "Free WiFi", "Extra Beds"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 16500,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      32.8847,
-      24.0907
-    ]
+    "coordinates": [32.8847, 24.0907]
   },
   "images": [
     "https://images.unsplash.com/photo-1532634896-26909d0d0d8b"
   ],
   "coverImage": "https://images.unsplash.com/photo-1532634896-26909d0d0d8b",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c70"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c70",
   "name": {
     "en": "Rixos Premium Seagate",
     "ar": "ريكسوس بريميوم سيجيت"
@@ -361,46 +421,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Deluxe Sea View",
+      "nameAr": "ديلوكس بإطلالة بحرية",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 50,
       "pricePerNight": 9500,
-      "capacity": 2
+      "amenities": ["Sea View", "Balcony", "Free WiFi", "Minibar"],
+      "images": ["https://images.unsplash.com/photo-1578683010236-d716f9a3f461"],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Room",
+      "nameAr": "غرفة عائلية",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 30,
       "pricePerNight": 15000,
-      "capacity": 5
+      "amenities": ["Sea View", "Connecting Rooms Available", "Free WiFi", "Kids Amenities"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Presidential Suite",
+      "nameAr": "جناح رئاسي",
+      "roomType": "suite",
+      "maxAdults": 4,
+      "maxChildren": 2,
+      "totalUnits": 4,
       "pricePerNight": 24000,
-      "capacity": 4
+      "amenities": ["Panoramic Sea View", "2 Bedrooms", "Living Room", "Private Pool Access", "Butler Service", "Free WiFi"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 16166,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      34.4297,
-      28.0405
-    ]
+    "coordinates": [34.4297, 28.0405]
   },
   "images": [
     "https://images.unsplash.com/photo-1578683010236-d716f9a3f461"
   ],
   "coverImage": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c71"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c71",
   "name": {
     "en": "Steigenberger ALDAU Beach Hotel",
     "ar": "فندق شتايجنبرجر الضيوء بيتش"
@@ -426,46 +496,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Superior Room - Sea View",
+      "nameAr": "غرفة سوبيريور بإطلالة بحرية",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 60,
       "pricePerNight": 7500,
-      "capacity": 2
+      "amenities": ["Sea View", "Balcony", "Free WiFi", "Minibar"],
+      "images": ["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85"],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Suite",
+      "nameAr": "جناح عائلي",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 20,
       "pricePerNight": 13000,
-      "capacity": 5
+      "amenities": ["Sea View", "2 Bedrooms", "Living Area", "Free WiFi", "Kids Amenities"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Royal Suite",
+      "nameAr": "جناح ملكي",
+      "roomType": "suite",
+      "maxAdults": 4,
+      "maxChildren": 2,
+      "totalUnits": 5,
       "pricePerNight": 19000,
-      "capacity": 4
+      "amenities": ["Panoramic Sea View", "2 Bedrooms", "Living Room", "Dining Area", "Private Terrace", "Butler Service", "Free WiFi"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 13166,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      33.8084,
-      27.2579
-    ]
+    "coordinates": [33.8084, 27.2579]
   },
   "images": [
     "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85"
   ],
   "coverImage": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c72"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c72",
   "name": {
     "en": "Dahab Paradise",
     "ar": "جنة دهب"
@@ -490,46 +570,56 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Standard Bungalow",
+      "nameAr": "بنجالو قياسي",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 25,
       "pricePerNight": 4200,
-      "capacity": 2
+      "amenities": ["Garden View", "Free WiFi", "Private Terrace"],
+      "images": ["https://images.unsplash.com/photo-1501117716987-6b2c086f2f57"],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Sea View Suite",
+      "nameAr": "جناح بإطلالة بحرية",
+      "roomType": "suite",
+      "maxAdults": 2,
+      "maxChildren": 2,
+      "totalUnits": 10,
       "pricePerNight": 7200,
-      "capacity": 4
+      "amenities": ["Sea View", "Living Area", "Free WiFi", "Minibar"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Bungalow",
+      "nameAr": "بنجالو عائلي",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 8,
       "pricePerNight": 9500,
-      "capacity": 5
+      "amenities": ["Garden View", "2 Bedrooms", "Free WiFi", "Extra Beds", "Private Terrace"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 6966,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      34.4971,
-      28.5053
-    ]
+    "coordinates": [34.4971, 28.5053]
   },
   "images": [
     "https://images.unsplash.com/photo-1501117716987-6b2c086f2f57"
   ],
   "coverImage": "https://images.unsplash.com/photo-1501117716987-6b2c086f2f57",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.592Z"
-  }
+  "isActive": true
 },
 {
-  "_id": {
-    "$oid": "6a22f13a2aff6e43a1ad3c73"
-  },
+  "_id": "6a22f13a2aff6e43a1ad3c73",
   "name": {
     "en": "Hilton Marsa Alam Nubian Resort",
     "ar": "هيلتون مرسى علم نوبيان ريزورت"
@@ -555,41 +645,53 @@ export const HOTELS_DATA = [{
   ],
   "rooms": [
     {
-      "type": "double",
+      "name": "Deluxe Room - Pool View",
+      "nameAr": "ديلوكس بإطلالة على المسبح",
+      "roomType": "double",
+      "maxAdults": 2,
+      "maxChildren": 1,
+      "totalUnits": 40,
       "pricePerNight": 8600,
-      "capacity": 2
+      "amenities": ["Pool View", "Balcony", "Free WiFi", "Minibar"],
+      "images": ["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85"],
+      "isActive": true
     },
     {
-      "type": "family",
+      "name": "Family Suite - Sea View",
+      "nameAr": "جناح عائلي بإطلالة بحرية",
+      "roomType": "family",
+      "maxAdults": 2,
+      "maxChildren": 3,
+      "totalUnits": 15,
       "pricePerNight": 14500,
-      "capacity": 5
+      "amenities": ["Sea View", "2 Bedrooms", "Living Area", "Free WiFi", "Kids Amenities"],
+      "images": [],
+      "isActive": true
     },
     {
-      "type": "suite",
+      "name": "Executive Suite",
+      "nameAr": "جناح تنفيذي",
+      "roomType": "suite",
+      "maxAdults": 4,
+      "maxChildren": 2,
+      "totalUnits": 6,
       "pricePerNight": 22000,
-      "capacity": 4
+      "amenities": ["Sea View", "2 Bedrooms", "Living Room", "Private Terrace", "Butler Service", "Free WiFi"],
+      "images": [],
+      "isActive": true
     }
   ],
   "averagePricePerNight": 15033,
   "currency": "EGP",
   "location": {
     "type": "Point",
-    "coordinates": [
-      34.8458,
-      25.0469
-    ]
+    "coordinates": [34.8458, 25.0469]
   },
   "images": [
     "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85"
   ],
   "coverImage": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
-  "isActive": true,
-  "createdAt": {
-    "$date": "2026-06-05T15:54:34.593Z"
-  },
-  "updatedAt": {
-    "$date": "2026-06-05T15:54:34.593Z"
-  }
+  "isActive": true
 }];
 
 // ─── Seeder function ─────────────────────────────────────────────────────────

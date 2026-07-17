@@ -11,6 +11,15 @@ export const createUsage = async (data) => {
 };
 
 /**
+ * Count AI usage logs with filtering
+ * @param {Object} filter 
+ * @returns {Promise<number>}
+ */
+export const countUsage = async (filter) => {
+  return AIUsageModel.countDocuments(filter);
+};
+
+/**
  * Get aggregated dashboard statistics
  * @returns {Promise<Object>}
  */
@@ -160,4 +169,93 @@ export const getTopDestinations = async (limit = 10) => {
       },
     },
   ]);
+};
+
+/**
+ * List AI usage logs with filtering and pagination
+ * @param {Object} options
+ * @param {number} options.page
+ * @param {number} options.limit
+ * @param {string} options.feature
+ * @param {string} options.userId
+ * @param {string} options.status
+ * @param {string} options.from
+ * @param {string} options.to
+ * @returns {Promise<Object>}
+ */
+export const listUsage = async ({ page = 1, limit = 20, feature, userId, status, from, to }) => {
+  const filter = {};
+  if (feature) filter.feature = feature;
+  if (userId) filter.user = userId;
+  if (status) filter.status = status;
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from);
+    if (to) filter.createdAt.$lte = new Date(to);
+  }
+
+  const [items, total] = await Promise.all([
+    AIUsageModel.find(filter)
+      .populate("user", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    AIUsageModel.countDocuments(filter),
+  ]);
+
+  return { items, total, page, limit };
+};
+
+/**
+ * Get AI usage statistics aggregated by feature
+ * @param {Object} options
+ * @param {string} options.from
+ * @param {string} options.to
+ * @returns {Promise<Array>}
+ */
+export const getUsageStats = async ({ from, to }) => {
+  const match = {};
+  if (from || to) {
+    match.createdAt = {};
+    if (from) match.createdAt.$gte = new Date(from);
+    if (to) match.createdAt.$lte = new Date(to);
+  }
+
+  return AIUsageModel.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: "$feature",
+        totalCalls: { $sum: 1 },
+        totalTokens: { $sum: "$totalTokens" },
+        totalCost: { $sum: "$cost" },
+        errorCount: { $sum: { $cond: [{ $eq: ["$status", "error"] }, 1, 0] } },
+        avgLatencyMs: { $avg: "$latencyMs" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        feature: "$_id",
+        totalCalls: 1,
+        totalTokens: 1,
+        totalCost: { $round: ["$totalCost", 6] },
+        errorCount: 1,
+        avgLatencyMs: { $round: ["$avgLatencyMs", 2] },
+      },
+    },
+  ]);
+};
+
+/**
+ * Get a single AI usage log by ID
+ * @param {string} id 
+ * @returns {Promise<Object|null>}
+ */
+export const getUsageById = async (id) => {
+  return AIUsageModel.findById(id)
+    .populate("user", "name email")
+    .populate("trip", "title destination")
+    .lean();
 };

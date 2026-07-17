@@ -16,8 +16,8 @@ if (!process.env.OPENAI_API_KEY) {
 // ── Chat model (NVIDIA endpoint, OpenAI-compatible) ──────────────────────────
 // Used by every agent sub-graph.
 export const chatLLM = new ChatOpenAI({
-  model: "openai/gpt-oss-20b",
-  temperature: 0.4,
+  model: "nvidia/nemotron-3-super-120b-a12b",
+  temperature: 0.5,
   maxTokens: 800,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
@@ -34,8 +34,8 @@ export const chatLLM = new ChatOpenAI({
 // detail-packed ones — the JSON never finished, safeJsonParse fell back to
 // {}, and nothing got merged into session.context. Raised for headroom.
 export const structuredLLM = new ChatOpenAI({
-  model: "openai/gpt-oss-20b",
-  temperature: 0.0,
+  model: "nvidia/nemotron-3-super-120b-a12b",
+  temperature: 0.3,
   maxTokens: 1200,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
@@ -43,28 +43,30 @@ export const structuredLLM = new ChatOpenAI({
   },
 });
 
-// Fastest reliable option — small dense model, low latency, high throughput
+// Booking agent uses Llama — keeps JSON compliance higher
 export const bookingLLM = new ChatOpenAI({
-  model: "meta/llama-3.1-8b-instruct",
-  temperature: 0.5,
-  maxTokens: 1000,
+  model: "nvidia/nemotron-3-ultra-550b-a55b",
+  temperature: 0.6,
+  maxTokens: 1500,
   apiKey: process.env.NVIDIA_API_KEY,
-  maxRetries: 3,
-  timeout: 15_000,
+  maxRetries: 4,        // langchain will retry on 429/5xx with backoff
+  timeout: 30_000,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
 });
 
+// Trip planner needs more tokens for full itineraries
 export const tripLLM = new ChatOpenAI({
-  model: "meta/llama-3.1-8b-instruct",
+  model: "nvidia/nemotron-3-ultra-550b-a55b",
   temperature: 0.6,
-  maxTokens: 2500,
+  maxTokens: 3000,
   apiKey: process.env.NVIDIA_API_KEY,
   configuration: {
     baseURL: "https://integrate.api.nvidia.com/v1",
   },
 });
+
 
 // // ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
 // // Used by the RAG retriever — NOT the chat models.
