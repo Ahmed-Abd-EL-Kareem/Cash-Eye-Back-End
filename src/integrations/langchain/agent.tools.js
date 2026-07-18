@@ -1392,8 +1392,13 @@ export const saveBookingTool = new DynamicStructuredTool({
     "hotelId MUST be the 24-char MongoDB ObjectId from search_hotels 'id' field. " +
     "NEVER call with placeholders like 'hotel_id', 'not found', or hotel names.",
   schema: z.object({
-    userId: z.string().describe("MongoDB ObjectId of the authenticated user"),
-    hotelId: z.string().describe("24-char MongoDB ObjectId from search_hotels 'id' field — NOT a hotel name"),
+    userId: z
+      .string()
+      .optional()
+      .describe(
+        "Internal field, injected automatically by the system. NEVER ask the user for this " +
+        "or mention it in conversation — omit it entirely when calling this tool."
+      ),    hotelId: z.string().describe("24-char MongoDB ObjectId from search_hotels 'id' field — NOT a hotel name"),
     checkIn: z.string().describe("Check-in date YYYY-MM-DD"),
     checkOut: z.string().describe("Check-out date YYYY-MM-DD"),
     guests: z.coerce.number().int().min(1).default(1),

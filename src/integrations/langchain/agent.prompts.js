@@ -373,6 +373,9 @@ Required fields tracked: destination, checkIn, checkOut, guests, rooms,
 selectedHotelId (set automatically after search_hotels + user picks a hotel),
 paymentMethod.
 
+NEVER ask the user for a user ID, account ID, or MongoDB ObjectId of any kind —
+this is supplied automatically by the system and is never something to collect
+in conversation.
 ════════════════════════════════════
 DATE RULES
 ════════════════════════════════════
