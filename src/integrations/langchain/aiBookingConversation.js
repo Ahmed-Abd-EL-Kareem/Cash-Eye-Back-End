@@ -277,11 +277,17 @@ async function bookingAgentNode(state) {
       session,
     };
   }
-
-  const ragQuery = `${session.slots.destination || ""} Egypt hotel booking ${session.step}`;
-  const ragContext = await retrieveContext(ragQuery, 4);
-  const ragBlock = ragContext ? `\n## Knowledge Base Context:\n${ragContext}\n` : "";
-
+  const RAG_STEPS = new Set(["destination", "preferences", "dates"]);
+  const ragBlock = RAG_STEPS.has(session.step)
+    ? (async () => {
+      const ragContext = await retrieveContext(
+        `${session.slots.destination || ""} Egypt hotel booking ${session.step}`,
+        4
+      );
+      return ragContext ? `\n## Knowledge Base Context:\n${ragContext}\n` : "";
+    })()
+    : Promise.resolve("");
+  const resolvedRagBlock = await ragBlock;
   const AFFIRMATIVE_RE = /\b(yes|yeah|yep|sure|ok(ay)?|confirm|proceed|book(\s?it|\s?now)?|go\s?ahead|sounds\s?good)\b/i;
 
   if (!session.slots.selectedHotelId && session.slots.lastSearchResults?.length) {
@@ -297,7 +303,7 @@ async function bookingAgentNode(state) {
       logger.info(`[Booking] Auto-matched hotel "${bestMatch.name}" → ${bestMatch.id}`);
     }
   }
-  resolveHotelSelection(session, state.userMessage);
+  // resolveHotelSelection(session, state.userMessage);
   const missingNow = getMissingFields(session.slots);
   const checkInOk = isValidBookingDate(session.slots.checkIn);
   const checkOutOk = isValidBookingDate(session.slots.checkOut);
@@ -320,11 +326,11 @@ async function bookingAgentNode(state) {
 
   const systemContent = BOOKING_SYSTEM
     .replace("{sessionContext}", sessionContextBlock)
-    .replace("{ragContext}", ragBlock)
+    .replace("{ragContext}", resolvedRagBlock)
     .replace("{currentYear}", String(CURRENT_YEAR))
     .replace("{languageInstruction}", buildLanguageInstruction(state.userMessage));
 
-  const history = session.messages.slice(-10).map((m) =>
+  const history = session.messages.slice(-6).map((m) =>
     m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
   );
 
@@ -340,7 +346,7 @@ async function bookingAgentNode(state) {
   let tokensUsed = 0;
   let bookingId = null;
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 4; i++) {
     const response = await bookingLLMWithTools.invoke(messages);
     messages.push(response);
     tokensUsed += response.usage_metadata?.total_tokens || 0;
@@ -449,6 +455,14 @@ async function bookingAgentNode(state) {
             session.slots.savedBookingId = bookingId;
           }
         } catch { /* */ }
+      }
+      if (bookingId) {
+        // booking succeeded this turn — ask the model for a short confirmation reply and stop
+        messages.push(new HumanMessage(`${buildLanguageInstruction(state.userMessage)} The booking was just saved successfully. Give a short, friendly confirmation with the booking ID and total price. Do not call any more tools.`));
+        const confirmResp = await bookingLLMWithTools.invoke(messages);
+        tokensUsed += confirmResp.usage_metadata?.total_tokens || 0;
+        finalReply = confirmResp.content || `Your booking is confirmed! Booking ID: ${bookingId}`;
+        break;   // ← stop looping the moment we have a real bookingId
       }
     }
   }

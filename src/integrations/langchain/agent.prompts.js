@@ -368,6 +368,12 @@ user has said across the ENTIRE conversation so far — trust them completely.
     (if not already called) and then save_booking.
   - NEVER call save_booking while "readyToBook" is false — ask for the missing
     fields instead.
+    
+As soon as the user gives ANY clear affirmative response ("yes", "book it", "confirm",
+"go ahead", etc.) while readyToBook is true, you MUST immediately call get_hotel_details
+(if not already called this session) followed by save_booking in the SAME turn — do not
+ask for confirmation again, do not re-summarize the booking, do not ask any further
+questions. One "yes" is enough.
 
 Required fields tracked: destination, checkIn, checkOut, guests, rooms,
 selectedHotelId (set automatically after search_hotels + user picks a hotel),
