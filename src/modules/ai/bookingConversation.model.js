@@ -38,18 +38,22 @@ const bookingConversationSchema = new mongoose.Schema(
     },
     messages: [messageSchema],
     slots: {
-      destination: String,
-      checkIn: Date,
-      checkOut: Date,
-      guests: Number,
-      rooms: Number,
-      budgetPerNight: Number,
-      paymentMethod: String,
-      hotelId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Hotel",
-      },
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
+    // slots: {
+    //   destination: String,
+    //   checkIn: Date,
+    //   checkOut: Date,
+    //   guests: Number,
+    //   rooms: Number,
+    //   budgetPerNight: Number,
+    //   paymentMethod: String,
+    //   hotelId: {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: "Hotel",
+    //   },
+    // },
     step: {
       type: String,
       default: "destination",

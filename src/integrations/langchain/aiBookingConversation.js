@@ -121,6 +121,7 @@ async function loadOrCreateSession(sessionId, userId, extraContext = {}) {
   });
   if (extraContext.tripId) session.slots.tripId = extraContext.tripId;
   if (extraContext.currentStep) session.step = extraContext.currentStep;
+  session.markModified("slots");   // ← add this
   await session.save();
   logger.info(`[Booking] New session ${newSessionId}`);
   return session;
@@ -153,6 +154,7 @@ async function saveSessionToDb(session, finalReply, bookingId, step, tokensUsed)
   });
   session.messages = session.messages.slice(-20);
   session.updatedAt = new Date();
+  session.markModified("slots");   // ← add this
 
   await session.save();
   logger.info(`[Booking] Session ${session.sessionId} saved at step "${session.step}" — ${tokensUsed} tokens`);
