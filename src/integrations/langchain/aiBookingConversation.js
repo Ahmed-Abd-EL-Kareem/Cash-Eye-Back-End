@@ -244,6 +244,20 @@ const matchHotelFromText = (lastSearchResults, text) => {
   }
   return null;
 };
+// ─── NEW: affirmative-confirmation regex + hotel-selection resolver ────
+const AFFIRMATIVE_RE = /\b(yes|yeah|yep|sure|ok(ay)?|confirm|proceed|book(\s?it|\s?now)?|go\s?ahead|sounds\s?good)\b/i;
+
+function resolveHotelSelection(session, userMessage) {
+  if (session.slots.selectedHotelId || !session.slots.lastSearchResults?.length) return;
+  let bestMatch = matchHotelFromText(session.slots.lastSearchResults, userMessage);
+  if (!bestMatch && session.slots.lastSearchResults.length === 1 && AFFIRMATIVE_RE.test(userMessage)) {
+    bestMatch = session.slots.lastSearchResults[0];
+  }
+  if (bestMatch) {
+    session.slots.selectedHotelId = bestMatch.id;
+    logger.info(`[Booking] Auto-matched hotel "${bestMatch.name}" → ${bestMatch.id}`);
+  }
+}
 
 // ─── NODE 3: BOOKING AGENT ────────────────────────────────────────────
 const bookingTools = [ragTool, searchHotelsTool, getHotelDetailsTool, saveBookingTool];
@@ -268,14 +282,22 @@ async function bookingAgentNode(state) {
   const ragContext = await retrieveContext(ragQuery, 4);
   const ragBlock = ragContext ? `\n## Knowledge Base Context:\n${ragContext}\n` : "";
 
+  const AFFIRMATIVE_RE = /\b(yes|yeah|yep|sure|ok(ay)?|confirm|proceed|book(\s?it|\s?now)?|go\s?ahead|sounds\s?good)\b/i;
+
   if (!session.slots.selectedHotelId && session.slots.lastSearchResults?.length) {
-    const bestMatch = matchHotelFromText(session.slots.lastSearchResults, state.userMessage);
+    let bestMatch = matchHotelFromText(session.slots.lastSearchResults, state.userMessage);
+
+    // Bare confirmation + exactly one hotel already shown = that hotel is selected
+    if (!bestMatch && session.slots.lastSearchResults.length === 1 && AFFIRMATIVE_RE.test(state.userMessage)) {
+      bestMatch = session.slots.lastSearchResults[0];
+    }
+
     if (bestMatch) {
       session.slots.selectedHotelId = bestMatch.id;
       logger.info(`[Booking] Auto-matched hotel "${bestMatch.name}" → ${bestMatch.id}`);
     }
   }
-
+  resolveHotelSelection(session, state.userMessage);
   const missingNow = getMissingFields(session.slots);
   const checkInOk = isValidBookingDate(session.slots.checkIn);
   const checkOutOk = isValidBookingDate(session.slots.checkOut);
@@ -408,7 +430,7 @@ async function bookingAgentNode(state) {
         }
       }
     }
-
+    resolveHotelSelection(session, state.userMessage);
     if (hasDetails) {
       for (const tm of toolResult.messages) {
         try {
