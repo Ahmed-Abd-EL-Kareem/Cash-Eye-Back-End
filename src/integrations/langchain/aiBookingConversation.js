@@ -366,7 +366,7 @@ async function bookingAgentNode(state) {
 
       const tc = response.tool_calls.find((t) => t.name === "save_booking");
       if (tc) {
-        tc.args.userId = tc.args.userId || session.slots.userId;
+        tc.args.userId = session.user.toString();   // always the authenticated user, never LLM-supplied
         tc.args.hotelId = tc.args.hotelId || session.slots.selectedHotelId;
         tc.args.checkIn = tc.args.checkIn || session.slots.checkIn;
         tc.args.checkOut = tc.args.checkOut || session.slots.checkOut;
