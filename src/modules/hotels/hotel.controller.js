@@ -1,6 +1,7 @@
 import asyncHandler from "../../utils/asyncHandler.js";
 
 import * as hotelService from "./hotel.service.js";
+import { validateAvailabilityQuery } from "../bookings/booking.validation.js";
 
 import {
   successResponse,
@@ -109,4 +110,22 @@ export const getTopHotels = asyncHandler(async (req, res) => {
     message: "Top hotels fetched successfully",
     data: { hotels },
   });
+});
+
+export const getHotelAvailability = asyncHandler(async (req, res) => {
+  const { checkIn, checkOut } = req.query;
+  const availability = await hotelService.getHotelAvailability(req.params.hotelId, checkIn, checkOut);
+  successResponse(res, { message: "Availability fetched", data: availability });
+});
+
+export const getRoomAvailability = asyncHandler(async (req, res) => {
+  const { checkIn, checkOut, quantity } = req.query;
+  const availability = await hotelService.getRoomAvailability(
+    req.params.hotelId,
+    req.params.roomId,
+    checkIn,
+    checkOut,
+    quantity || 1
+  );
+  successResponse(res, { message: "Room availability fetched", data: availability });
 });

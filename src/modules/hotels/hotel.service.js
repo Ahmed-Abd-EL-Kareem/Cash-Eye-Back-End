@@ -240,6 +240,7 @@
 //   });
 // };
 import * as repo from "./hotel.repository.js";
+import * as bookingRepository from "../bookings/booking.repository.js";
 import ApiError from "../../utils/apiError.js";
 import logger from "../../config/logger.js";
 import HotelModel from "./hotel.model.js";
@@ -512,4 +513,64 @@ export const getTopHotels = async (limit = 5) => {
       rating: hotel.stars,
     };
   });
+};
+
+export const getHotelAvailability = async (hotelId, checkIn, checkOut) => {
+  const hotel = await HotelModel.findById(hotelId).select("rooms");
+  if (!hotel) throw new ApiError("Hotel not found", 404);
+
+  const occupiedAggregation = await bookingRepository.getAvailabilityForHotel(hotelId, checkIn, checkOut);
+  const occupiedMap = new Map(occupiedAggregation.map((o) => [o._id.toString(), o.occupiedUnits]));
+
+  return hotel.rooms
+    .filter((r) => r.isActive)
+    .map((room) => {
+      const occupied = occupiedMap.get(room._id.toString()) || 0;
+      const available = room.totalUnits - occupied;
+      return {
+        roomId: room._id,
+        name: room.name,
+        nameAr: room.nameAr,
+        roomType: room.roomType,
+        totalUnits: room.totalUnits,
+        occupiedUnits: occupied,
+        availableUnits: Math.max(0, available),
+        maxAdults: room.maxAdults,
+        maxChildren: room.maxChildren,
+        maxOccupancy: room.maxOccupancy,
+        pricePerNight: room.pricePerNight,
+        amenities: room.amenities,
+        images: room.images,
+      };
+    });
+};
+
+export const getRoomAvailability = async (hotelId, roomId, checkIn, checkOut, quantity = 1) => {
+  const hotel = await HotelModel.findById(hotelId);
+  if (!hotel) throw new ApiError("Hotel not found", 404);
+
+  const roomDoc = hotel.rooms.id(roomId);
+  if (!roomDoc || !roomDoc.isActive) throw new ApiError("Room not found", 404);
+
+  const occupied = await bookingRepository.getOccupiedUnitsForRoom(
+    hotelId,
+    roomId,
+    checkIn,
+    checkOut
+  );
+  const available = roomDoc.totalUnits - occupied;
+
+  return {
+    roomId: roomDoc._id,
+    name: roomDoc.name,
+    roomType: roomDoc.roomType,
+    totalUnits: roomDoc.totalUnits,
+    occupiedUnits: occupied,
+    availableUnits: Math.max(0, available),
+    requestedQuantity: quantity,
+    isAvailable: available >= quantity,
+    maxAdults: roomDoc.maxAdults,
+    maxChildren: roomDoc.maxChildren,
+    pricePerNight: roomDoc.pricePerNight,
+  };
 };

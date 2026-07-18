@@ -1,15 +1,11 @@
 import ApiError from "../../utils/apiError.js";
 import mongoose from "mongoose";
 
-export const validateObjectId = (
-  req,
-  res,
-  next
-) => {
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return next(new ApiError("Invalid hotel ID", 400));
+export const validateObjectId = (paramName = "id") => (req, res, next) => {
+  const value = req.params[paramName];
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    return next(new ApiError(`Invalid ${paramName}`, 400));
   }
-
   next();
 };
 

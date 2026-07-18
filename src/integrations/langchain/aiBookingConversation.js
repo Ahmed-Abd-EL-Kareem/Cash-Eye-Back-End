@@ -137,9 +137,20 @@ async function saveSessionToDb(session, finalReply, bookingId, step, tokensUsed)
     session.step = session.slots._nextStep;
     delete session.slots._nextStep;
   } else {
+    // Only advance the step forward — never jump backward or skip past hotel_selection
+    // without a real hotel search having occurred first.
+    const STEP_ORDER = ["destination", "dates", "budget", "preferences", "hotel_selection", "guest_info", "payment", "complete"];
+    const currentIdx = STEP_ORDER.indexOf(session.step);
     const replyLower = finalReply.toLowerCase();
+
     for (const [s, keywords] of Object.entries(STEP_KEYWORDS)) {
-      if (s === "complete") continue; // ← never infer completion from prose
+      if (s === "complete") continue; // never infer completion from prose
+      const candidateIdx = STEP_ORDER.indexOf(s);
+      // Only advance — never go backward, never jump more than 2 steps at a time
+      if (candidateIdx <= currentIdx || candidateIdx > currentIdx + 2) continue;
+      // Never jump to hotel_selection just because 'hotel' appears in text,
+      // unless a search was actually performed this session
+      if (s === "hotel_selection" && !session.slots.lastSearchResults?.length) continue;
       if (keywords.some((kw) => replyLower.includes(kw))) {
         session.step = s;
         break;
@@ -155,7 +166,10 @@ async function saveSessionToDb(session, finalReply, bookingId, step, tokensUsed)
   session.messages = session.messages.slice(-20);
   session.updatedAt = new Date();
   session.markModified("slots");   // ← add this
-
+  if (!bookingId && /booking (is )?confirmed|booking reference/i.test(finalReply)) {
+    logger.error(`[Booking] CRITICAL: fabricated confirmation reached session save — session ${session.sessionId}`);
+    finalReply = "I'm processing your booking now — let me confirm the details are fully submitted before I give you a final confirmation.";
+  }
   await session.save();
   logger.info(`[Booking] Session ${session.sessionId} saved at step "${session.step}" — ${tokensUsed} tokens`);
   return session;
@@ -309,7 +323,7 @@ async function bookingAgentNode(state) {
   const missingNow = getMissingFields(session.slots);
   const checkInOk = isValidBookingDate(session.slots.checkIn);
   const checkOutOk = isValidBookingDate(session.slots.checkOut);
-  const stillMissing = [
+  let stillMissing = [
     ...missingNow.filter((f) => f !== "checkIn" && f !== "checkOut"),
     !checkInOk ? "checkIn" : null,
     !checkOutOk ? "checkOut" : null,
@@ -342,8 +356,9 @@ async function bookingAgentNode(state) {
     new HumanMessage(state.userMessage),
   ];
 
-  session.messages.push({ role: "user", content: state.userMessage, timestamp: new Date() });
-
+  const CARD_NUMBER_RE = /\b(?:\d[ -]*?){13,19}\b/g;
+  const sanitizedUserMessage = state.userMessage.replace(CARD_NUMBER_RE, "[redacted]");
+  session.messages.push({ role: "user", content: sanitizedUserMessage, timestamp: new Date() });
   let finalReply = null;
   let tokensUsed = 0;
   let bookingId = null;
@@ -355,11 +370,37 @@ async function bookingAgentNode(state) {
 
     if (!response.tool_calls?.length) {
       const raw = (response.content || "").trim();
-      if (raw.startsWith("{") || raw.startsWith("[")) {
+      const looksLikeReasoning = raw.length > 150 && /\b(I need to|Let me|I should|I'll use|the user (has|wants|provided))\b/i.test(raw);
+      const fabricatedConfirmation = !bookingId && /\b(booking (is )?confirmed|booking reference|confirmation email (has been|was) sent)\b/i.test(raw);
+      const readyAndConfirmedButStalling =
+        !bookingId &&
+        stillMissing.length === 0 &&
+        session.slots.userConfirmed === true;
+
+      if (raw.startsWith("{") || raw.startsWith("[") || looksLikeReasoning || fabricatedConfirmation || readyAndConfirmedButStalling) {
+        if (fabricatedConfirmation) {
+          logger.warn(`[Booking] Blocked fabricated confirmation — no real bookingId this turn`);
+        }
+        if (readyAndConfirmedButStalling) {
+          logger.warn(`[Booking] Model stalled instead of calling save_booking — forcing it`);
+        }
+        // Build a detailed nudge that includes ALL current slot values so the
+        // LLM can construct save_booking correctly without guessing
+        const slotSummary = JSON.stringify({
+          hotelId: session.slots.selectedHotelId,
+          checkIn: session.slots.checkIn,
+          checkOut: session.slots.checkOut,
+          guests: session.slots.guests,
+          rooms: session.slots.rooms,
+          paymentMethod: session.slots.paymentMethod,
+        });
         messages.push(
           new HumanMessage(
-            `${buildLanguageInstruction(state.userMessage)} Please summarise that in a ` +
-            "friendly, human-readable message. Do not output raw JSON."
+            fabricatedConfirmation
+              ? "SYSTEM: You have NOT actually saved this booking. Do not output any confirmation text. Call save_booking NOW with the slot values already in session context."
+              : readyAndConfirmedButStalling
+                ? `SYSTEM: readyToBook is true and the user already confirmed. Call save_booking NOW with these exact values — do NOT ask any questions or re-summarise: ${slotSummary}`
+                : `${buildLanguageInstruction(state.userMessage)} Either call the appropriate tool now, or give a short, final, user-facing reply.`
           )
         );
         continue;
@@ -393,6 +434,27 @@ async function bookingAgentNode(state) {
       if (saveArgs.paymentMethod) session.slots.paymentMethod = saveArgs.paymentMethod;
       if (saveArgs.specialRequests !== undefined) session.slots.specialRequests = saveArgs.specialRequests;
       if (saveArgs.hotelId && isValidObjectId(saveArgs.hotelId)) session.slots.selectedHotelId = saveArgs.hotelId;
+    
+      // Recompute AFTER merging — this is the actual fix
+      const recheckMissing = getMissingFields(session.slots);
+      const recheckCheckInOk = isValidBookingDate(session.slots.checkIn);
+      const recheckCheckOutOk = isValidBookingDate(session.slots.checkOut);
+      stillMissing = [
+        ...recheckMissing.filter((f) => f !== "checkIn" && f !== "checkOut"),
+        !recheckCheckInOk ? "checkIn" : null,
+        !recheckCheckOutOk ? "checkOut" : null,
+      ].filter(Boolean);
+
+      if (stillMissing.length > 0) {
+        logger.warn(`[Booking] save_booking blocked — missing: ${stillMissing.join(", ")}`);
+        messages.push(
+          new HumanMessage(
+            `SYSTEM: Cannot save booking yet. Still need from the user: ${stillMissing.join(", ")}. ` +
+            `Ask the user for these missing details — do not call save_booking again until you have them.`
+          )
+        );
+        continue;
+      }
 
       const tc = response.tool_calls.find((t) => t.name === "save_booking");
       if (tc) {
@@ -470,15 +532,44 @@ async function bookingAgentNode(state) {
   }
 
   if (!finalReply) {
-    messages.push(
-      new HumanMessage(
-        `${buildLanguageInstruction(state.userMessage)} Please give a friendly summary of ` +
-        "where we are and what the next step is."
-      )
-    );
-    const recovery = await bookingLLMWithTools.invoke(messages);
-    tokensUsed += recovery.usage_metadata?.total_tokens || 0;
-    finalReply = recovery.content || "How can I help with your hotel booking?";
+    // Last resort: if all fields are present and user confirmed but model never
+    // called save_booking through 4 iterations, call the tool programmatically.
+    if (stillMissing.length === 0 && session.slots.userConfirmed && session.slots.selectedHotelId) {
+      logger.warn(`[Booking] Programmatic save_booking fallback — model exhausted loop without calling tool`);
+      try {
+        const toolResult = await saveBookingTool.invoke({
+          userId: session.user.toString(),
+          hotelId: session.slots.selectedHotelId,
+          checkIn: session.slots.checkIn,
+          checkOut: session.slots.checkOut,
+          guests: session.slots.guests || 1,
+          rooms: session.slots.rooms || 1,
+          paymentMethod: session.slots.paymentMethod || "credit_card",
+          specialRequests: session.slots.specialRequests,
+        });
+        const parsed = JSON.parse(toolResult);
+        if (parsed.success && parsed.bookingId) {
+          bookingId = parsed.bookingId;
+          session.slots.savedBookingId = bookingId;
+          finalReply = `Your booking is confirmed! 🎉 Booking ID: **${bookingId}** | Total: ${parsed.currency} ${parsed.totalPrice?.toLocaleString()} for ${parsed.nights} night(s). A confirmation will be sent to your registered email.`;
+        } else {
+          finalReply = `I'm sorry, I couldn't complete the booking: ${parsed.error || "unknown error"}. Please try again or contact support.`;
+        }
+      } catch (err) {
+        logger.error(`[Booking] Programmatic save fallback failed: ${err.message}`);
+        finalReply = "I'm sorry, something went wrong saving your booking. Please try again.";
+      }
+    } else {
+      messages.push(
+        new HumanMessage(
+          `${buildLanguageInstruction(state.userMessage)} Please give a friendly summary of ` +
+          "where we are and what the next step is."
+        )
+      );
+      const recovery = await bookingLLMWithTools.invoke(messages);
+      tokensUsed += recovery.usage_metadata?.total_tokens || 0;
+      finalReply = recovery.content || "How can I help with your hotel booking?";
+    }
   }
 
   return { _rawReply: finalReply, _tokens: tokensUsed, _bookingId: bookingId, session };

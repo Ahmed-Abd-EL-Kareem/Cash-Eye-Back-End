@@ -58,9 +58,8 @@ const roomSchema = new mongoose.Schema(
   { _id: true, timestamps: true },
 );
 
-roomSchema.pre("save", function (next) {
+roomSchema.pre("save", function () {
   this.maxOccupancy = this.maxAdults + this.maxChildren;
-  next();
 });
 
 // ─── Main Hotel Schema ───────────────────────────────────────
