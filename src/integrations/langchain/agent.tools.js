@@ -1462,14 +1462,20 @@ export const saveBookingTool = new DynamicStructuredTool({
   //   }
   // },
   func: async ({ userId, hotelId, checkIn, checkOut, guests, rooms, paymentMethod, specialRequests }) => {
-    if (!isValidObjectId(hotelId)) { /* unchanged */ }
+    if (!isValidObjectId(hotelId)) {
+      logger.warn(`[SaveBooking Tool] Rejected invalid hotelId: "${hotelId}"`);
+      return JSON.stringify({
+        success: false,
+        error: `Invalid hotelId "${hotelId}". Use the 24-char 'id' from search_hotels results.`,
+      });
+    }
 
     try {
+      const BookingModel = await getBookingModel();
       const hotelService = await getHotelService();
       const hotel = await hotelService.getHotelById(hotelId);
       if (!hotel) return JSON.stringify({ success: false, error: "Hotel not found" });
 
-      // pick an active room that fits the requested guest count
       const roomDoc = (hotel.rooms || []).find(
         (r) => r.isActive && r.maxAdults * rooms >= guests
       ) || (hotel.rooms || []).find((r) => r.isActive);
