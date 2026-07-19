@@ -18,4 +18,14 @@ const sendCookie = (res, token) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
+
+export const clearCookie = (res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+  });
+};
+
 export default sendCookie;

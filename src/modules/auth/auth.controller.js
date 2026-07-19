@@ -5,6 +5,7 @@ import {
   verifyOTP,
   resetPassword,
   googleCallback,
+  logout,
 } from "./auth.service.js";
 
 export const register = (req, res, next) => signup(req, res, next);
@@ -18,3 +19,5 @@ export const verifyOtp = (req, res, next) => verifyOTP(req, res, next);
 export const resetPass = (req, res, next) => resetPassword(req, res, next);
 
 export const googleAuthCallback = (req, res, next) => googleCallback(req, res, next);
+
+export const logoutUser = (req, res, next) => logout(req, res, next);

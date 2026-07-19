@@ -5,7 +5,7 @@ import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import generateToken from "../../utils/jwt.js";
-import sendCookie from "../../utils/sendCookie.js";
+import sendCookie, { clearCookie } from "../../utils/sendCookie.js";
 import { generateRandomNumber } from "../../utils/generateOTP.js";
 import { sendForgetEmail, sendWelcomeEmail } from "../../utils/email.js";
 
@@ -185,4 +185,12 @@ export const googleCallback = asyncHandler(async (req, res) => {
   const token = generateToken(req.user._id);
   sendCookie(res, token);
   res.redirect(`${process.env.CLIENT_URL}?token=${token}`);
+});
+
+export const logout = asyncHandler(async (req, res) => {
+  clearCookie(res);
+  res.status(200).json({
+    status: "success",
+    message: "Logged out successfully",
+  });
 });

@@ -43,7 +43,8 @@ export const getRoomAvailability = asyncHandler(async (req, res) => {
 });
 
 export const createCheckoutSessionForHold = asyncHandler(async (req, res) => {
-  const { holdId, currency } = req.body;
+  const { holdId } = req.params;
+  const { currency } = req.body;
   const result = await bookingService.createCheckoutSessionForHold(holdId, req.user._id, currency);
   successResponse(res, {
     message: "Checkout session created",
