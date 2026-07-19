@@ -203,10 +203,14 @@ export const createCheckoutSessionForHold = async (holdId, userId, currency) => 
       holdId: hold._id.toString(),
       userId: userId.toString(),
     },
-    expires_at: Math.min(
-      Math.floor(hold.expiresAt.getTime() / 1000),
-      Math.floor(Date.now() / 1000) + 24 * 60 * 60
-    ),
+    expires_at: (() => {
+      const minExpiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
+      const maxExpiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+      return Math.min(
+        Math.max(Math.floor(hold.expiresAt.getTime() / 1000), minExpiresAt),
+        maxExpiresAt
+      );
+    })(),
   });
 
   hold.stripeCheckoutSessionId = session.id;
