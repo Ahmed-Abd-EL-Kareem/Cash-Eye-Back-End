@@ -20,13 +20,20 @@ export const createHold = asyncHandler(async (req, res) => {
 });
 
 export const getHoldStatus = asyncHandler(async (req, res) => {
-  const status = await bookingService.getHoldStatus(req.params.holdId, req.user._id);
+  const status = await bookingService.getHoldStatus(
+    req.params.holdId,
+    req.user._id,
+  );
   successResponse(res, { message: "Hold status fetched", data: status });
 });
 
 export const getAvailability = asyncHandler(async (req, res) => {
   const { checkIn, checkOut } = req.query;
-  const availability = await bookingService.getAvailability(req.params.hotelId, checkIn, checkOut);
+  const availability = await bookingService.getAvailability(
+    req.params.hotelId,
+    checkIn,
+    checkOut,
+  );
   successResponse(res, { message: "Availability fetched", data: availability });
 });
 
@@ -37,15 +44,22 @@ export const getRoomAvailability = asyncHandler(async (req, res) => {
     req.params.roomId,
     checkIn,
     checkOut,
-    quantity || 1
+    quantity || 1,
   );
-  successResponse(res, { message: "Room availability fetched", data: availability });
+  successResponse(res, {
+    message: "Room availability fetched",
+    data: availability,
+  });
 });
 
 export const createCheckoutSessionForHold = asyncHandler(async (req, res) => {
   const { holdId } = req.params;
-  const { currency } = req.body;
-  const result = await bookingService.createCheckoutSessionForHold(holdId, req.user._id, currency);
+  const { currency = "EGP" } = req.body || {};
+  const result = await bookingService.createCheckoutSessionForHold(
+    holdId,
+    req.user._id,
+    currency,
+  );
   successResponse(res, {
     message: "Checkout session created",
     data: result,
@@ -63,12 +77,18 @@ export const getMyBookings = asyncHandler(async (req, res) => {
 });
 
 export const getBookingById = asyncHandler(async (req, res) => {
-  const booking = await bookingService.getBookingById(req.params.id, req.user._id);
+  const booking = await bookingService.getBookingById(
+    req.params.id,
+    req.user._id,
+  );
   successResponse(res, { message: "Booking fetched", data: booking });
 });
 
 export const cancelBooking = asyncHandler(async (req, res) => {
-  const booking = await bookingService.cancelBooking(req.params.id, req.user._id);
+  const booking = await bookingService.cancelBooking(
+    req.params.id,
+    req.user._id,
+  );
   successResponse(res, { message: "Booking canceled", data: booking });
 });
 
@@ -83,7 +103,10 @@ export const adminGetAllBookings = asyncHandler(async (req, res) => {
 });
 
 export const adminUpdateStatus = asyncHandler(async (req, res) => {
-  const booking = await bookingService.adminUpdateStatus(req.params.id, req.body.status);
+  const booking = await bookingService.adminUpdateStatus(
+    req.params.id,
+    req.body.status,
+  );
   successResponse(res, { message: "Booking status updated", data: booking });
 });
 
