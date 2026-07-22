@@ -250,7 +250,44 @@ export const createBooking = async (userId, data) => {
   const nights = calculateNights(checkIn, checkOut);
   if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
 
-  const totalPrice = hotel.averagePricePerNight * nights * (data.rooms || 1);
+  if (!data.rooms || !Array.isArray(data.rooms) || data.rooms.length === 0) {
+    throw new ApiError("At least one room selection is required", 400);
+  }
+
+  let totalPrice = 0;
+  const roomsData = [];
+
+  for (const selection of data.rooms) {
+    const roomDoc = hotel.rooms.id(selection.room);
+    if (!roomDoc || !roomDoc.isActive) {
+      throw new ApiError(`Room ${selection.room} not found or inactive`, 404);
+    }
+
+    const maxAdultsForSelection = roomDoc.maxAdults * selection.quantity;
+    const maxChildrenForSelection = roomDoc.maxChildren * selection.quantity;
+
+    if (selection.guests.adults > maxAdultsForSelection) {
+      throw new ApiError(
+        `Room "${roomDoc.name}" allows max ${roomDoc.maxAdults} adults per unit (${maxAdultsForSelection} total for ${selection.quantity} unit(s))`,
+        400
+      );
+    }
+    if (selection.guests.children > maxChildrenForSelection) {
+      throw new ApiError(
+        `Room "${roomDoc.name}" allows max ${roomDoc.maxChildren} children per unit (${maxChildrenForSelection} total for ${selection.quantity} unit(s))`,
+        400
+      );
+    }
+
+    totalPrice += roomDoc.pricePerNight * selection.quantity * nights;
+    roomsData.push({
+      room: roomDoc._id,
+      roomType: roomDoc.roomType,
+      quantity: selection.quantity,
+      guests: selection.guests,
+      pricePerNight: roomDoc.pricePerNight,
+    });
+  }
 
   const booking = await BookingModel.create({
     user: userId,
@@ -258,15 +295,7 @@ export const createBooking = async (userId, data) => {
     trip: data.trip || null,
     checkIn,
     checkOut,
-    rooms: [
-      {
-        room: data.room,
-        roomType: data.roomType || "double",
-        quantity: data.rooms || 1,
-        guests: { adults: data.guests || 1, children: 0 },
-        pricePerNight: hotel.averagePricePerNight,
-      },
-    ],
+    rooms: roomsData,
     totalPrice,
     currency: hotel.currency,
     specialRequests: data.specialRequests || null,
