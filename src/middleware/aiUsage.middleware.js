@@ -5,7 +5,7 @@ import AIUsageModel from "../modules/aiUsage/aiUsage.model.js";
 import AILogModel from "../modules/aiUsage/aiLog.model.js";
 import SubscriptionModel from "../modules/subscriptions/subscription.model.js";
 import logger from "../config/logger.js";
-import ApiError from "../utils/ApiError.js";
+import ApiError from "../utils/apiError.js";
 
 /**
  * Check if user has exceeded their AI usage quota

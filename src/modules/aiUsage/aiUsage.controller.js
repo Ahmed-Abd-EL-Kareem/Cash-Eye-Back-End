@@ -1,7 +1,7 @@
 import asyncHandler from "../../utils/asyncHandler.js";
 import * as aiUsageService from "./aiUsage.service.js";
 import { successResponse, createdResponse } from "../../utils/apiResponse.js";
-import ApiError from "../../utils/ApiError.js";
+import ApiError from "../../utils/apiError.js";
 
 /**
  * POST /api/v1/ai-usage
