@@ -4,6 +4,7 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 import app from "./app.js";
 import { connectDB } from "./src/config/db.js";
 import { seedPlans } from "./src/modules/subscriptions/plan/plan.service.js";
+import "./src/jobs/aiLog.retention.job.js";
 
 const port = process.env.PORT || 3000;
 

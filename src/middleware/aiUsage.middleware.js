@@ -1,71 +1,35 @@
 // aiUsage.middleware.js
-// Middleware that logs AI usage to the AIUsage collection.
-// Wraps res.json to capture the response (success or error) after the handler runs.
-// Usage: router.post("/chat", protect, aiUsageMiddleware("chat"), controller.chat);
+// Middleware for AI usage quota checking and logging
 
 import AIUsageModel from "../modules/aiUsage/aiUsage.model.js";
+import AILogModel from "../modules/aiUsage/aiLog.model.js";
 import SubscriptionModel from "../modules/subscriptions/subscription.model.js";
-import logger from "../config/logger.js";
+import { logger } from "../config/logger.js";
+import { ApiError } from "../utils/ApiError.js";
 
 /**
- * Record actual AI usage after a successful response.
- * Call this in controllers after the AI service returns.
+ * Check if user has exceeded their AI usage quota
+ * Attaches subscription info to req for downstream use
  *
- * @param {object} subscription   - req.subscription set by checkAIQuota
- * @param {object} options
- * @param {boolean} options.isTripGeneration - true for POST /trips/generate
- * @param {number}  options.tokensUsed       - actual tokens consumed by the LLM
+ * @param {boolean} isTripGeneration - Pass true for trip generation routes
+ * @returns {Function} Express middleware
  */
-export const recordAIUsage = async (
-  subscription,
-  { isTripGeneration = false, tokensUsed = 0 } = {}
-) => {
-  subscription.usage.requestsToday += 1;
-  subscription.usage.lastRequestDate = new Date();
-
-  // Token accounting
-  if (tokensUsed > 0) {
-    subscription.usage.tokensUsedThisMonth =
-      (subscription.usage.tokensUsedThisMonth || 0) + tokensUsed;
-  }
-
-  // Trip quota accounting
-  if (isTripGeneration) {
-    subscription.usage.tripsThisMonth =
-      (subscription.usage.tripsThisMonth || 0) + 1;
-  }
-
-  await subscription.save();
-
-  logger.info(
-    `[AIUsage] recorded — requests_today=${subscription.usage.requestsToday}` +
-    ` tokens_month=${subscription.usage.tokensUsedThisMonth}` +
-    (isTripGeneration ? ` trips_month=${subscription.usage.tripsThisMonth}` : "")
-  );
-};
-
-/**
- * Middleware: checks quota limits BEFORE the route handler runs.
- * Attaches subscription to req.subscription for use in recordAIUsage.
- *
- * @param {boolean} isTripGeneration - pass true for trip generation routes
- */
-export const checkAIQuota = (isTripGeneration = false) =>
-  async (req, res, next) => {
+export const checkAIQuota = (isTripGeneration = false) => async (req, res, next) => {
+  try {
     const subscription = await SubscriptionModel.findOne({
       user: req.user._id,
     }).populate("plan", "limits name");
 
     if (!subscription) {
       return next(
-        new (await import("../utils/apiError.js")).default(
+        new ApiError(
           "No active subscription found. Please subscribe to continue.",
           403
         )
       );
     }
 
-    // Reset counters if a new day/month has started
+    // Reset counters if new day/month
     subscription.checkAndResetMonthly();
     subscription.checkAndResetDaily();
     if (typeof subscription.checkAndResetTrips === "function") {
@@ -80,7 +44,7 @@ export const checkAIQuota = (isTripGeneration = false) =>
       subscription.usage.tokensUsedThisMonth >= tokensPerMonth
     ) {
       return next(
-        new (await import("../utils/apiError.js")).default(
+        new ApiError(
           `Monthly token limit reached (${tokensPerMonth.toLocaleString()} tokens). Please upgrade your plan.`,
           429
         )
@@ -90,8 +54,8 @@ export const checkAIQuota = (isTripGeneration = false) =>
     // Check daily request quota (all AI features)
     if (subscription.usage.requestsToday >= requestsPerDay) {
       return next(
-        new (await import("../utils/apiError.js")).default(
-          `Daily AI request limit reached (${requestsPerDay}/day). Upgrade to Traveler plan for more.`,
+        new ApiError(
+          `Daily AI request limit reached (${requestsPerDay}/day). Upgrade for more.`,
           429
         )
       );
@@ -106,7 +70,7 @@ export const checkAIQuota = (isTripGeneration = false) =>
 
       if (tripsLimit !== Infinity && tripsThisMonth >= tripsLimit) {
         return next(
-          new (await import("../utils/apiError.js")).default(
+          new ApiError(
             `Monthly trip limit reached (${tripsLimit} trips/month on the free plan). Upgrade to Traveler for unlimited trips.`,
             429
           )
@@ -119,64 +83,155 @@ export const checkAIQuota = (isTripGeneration = false) =>
 
     logger.info(
       `[AIUsage] user=${req.user._id}` +
-      ` requests_today=${subscription.usage.requestsToday}/${requestsPerDay}` +
-      ` tokens_month=${subscription.usage.tokensUsedThisMonth}/${tokensPerMonth ?? "∞"}` +
-      (isTripGeneration
-        ? ` trips_month=${subscription.usage.tripsThisMonth || 0}/${tripsPerMonth ?? "∞"}`
-        : "")
+        ` requests_today=${subscription.usage.requestsToday}/${requestsPerDay}` +
+        ` tokens_month=${subscription.usage.tokensUsedThisMonth}/${tokensPerMonth ?? "∞"}` +
+        (isTripGeneration
+          ? ` trips_month=${subscription.usage.tripsThisMonth || 0}/${tripsPerMonth ?? "∞"}`
+          : "")
     );
 
     next();
-  };
+  } catch (error) {
+    logger.error("[AIUsage] Quota check failed:", error);
+    next(error);
+  }
+};
 
 /**
- * Middleware factory that creates an AI usage logger for a specific feature.
- * Logs to the AIUsage collection after the response is sent.
+ * Record AI usage after a successful AI call
+ * This should be called in the controller AFTER the AI service returns
  *
- * @param {string} feature - One of: "chat", "bookingConversation", "hotelAiSearch", "recommendations", "tripPlanner"
+ * @param {Object} params
+ * @param {string} params.feature - Feature name
+ * @param {string} params.sessionId - Session ID (optional)
+ * @param {string} params.tripId - Trip ID (optional)
+ * @param {string} params.prompt - Prompt text
+ * @param {string} params.response - Response text
+ * @param {string} params.model - Model name
+ * @param {number} params.promptTokens - Prompt tokens
+ * @param {number} params.completionTokens - Completion tokens
+ * @param {number} params.totalTokens - Total tokens
+ * @param {number} params.cost - Cost in USD
+ * @param {number} params.latencyMs - Latency in ms
+ * @param {string} params.status - "success" or "error"
+ * @param {string} params.errorMessage - Error message if failed
+ */
+export const recordAIUsage = async (req, params) => {
+  const {
+    feature,
+    sessionId = null,
+    tripId = null,
+    prompt = "",
+    response = "",
+    model = "gpt-4o-mini",
+    promptTokens = 0,
+    completionTokens = 0,
+    totalTokens = promptTokens + completionTokens,
+    cost = 0,
+    latencyMs = 0,
+    status = "success",
+    errorMessage = null,
+  } = params;
+
+  const date = new Date().toISOString().split("T")[0];
+
+  try {
+    // Increment daily usage counter (upsert)
+    await AIUsageModel.findOneAndUpdate(
+      { user: req.user._id, feature, date },
+      {
+        $inc: { tokensUsed: totalTokens, requestCount: 1, cost },
+        $setOnInsert: { user: req.user._id, feature, date },
+      },
+      { upsert: true, new: true }
+    );
+
+    // Update subscription usage
+    const subscription = await SubscriptionModel.findOne({ user: req.user._id });
+    if (subscription) {
+      subscription.usage.requestsToday += 1;
+      subscription.usage.lastRequestDate = new Date();
+      subscription.usage.tokensUsedThisMonth =
+        (subscription.usage.tokensUsedThisMonth || 0) + totalTokens;
+      if (tripId) {
+        subscription.usage.tripsThisMonth =
+          (subscription.usage.tripsThisMonth || 0) + 1;
+      }
+      await subscription.save();
+    }
+
+    // Create detailed log entry (fire-and-forget to avoid blocking response)
+    AILogModel.create({
+      user: req.user._id,
+      feature,
+      sessionId,
+      trip: tripId,
+      prompt,
+      response,
+      model,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      cost,
+      latencyMs,
+      status,
+      errorMessage,
+    }).catch((err) => {
+      logger.error(`[AIUsage] Failed to create log for feature "${feature}":`, err);
+    });
+
+    logger.info(
+      `[AIUsage] recorded — user=${req.user._id} feature=${feature}` +
+        ` tokens=${totalTokens} cost=${cost} latency=${latencyMs}ms status=${status}`
+    );
+  } catch (error) {
+    logger.error("[AIUsage] Failed to record usage:", error);
+    // Don't throw - logging failure shouldn't break the response
+  }
+};
+
+/**
+ * Middleware factory for logging AI usage after response
+ * Use this in routes where you want automatic logging
+ * 
+ * @param {string} feature - Feature name
  * @returns {Function} Express middleware
  */
-export const aiUsageMiddleware = (feature) => {
-  return async (req, res, next) => {
-    const start = Date.now();
+export const aiUsageLogger = (feature) => async (req, res, next) => {
+  const start = Date.now();
 
-    // Store original json method to call after logging
-    const originalJson = res.json.bind(res);
+  // Store original json method
+  const originalJson = res.json.bind(res);
 
-    // Override res.json to log usage after the handler completes
-    res.json = (body) => {
-      // Calculate latency
-      const latencyMs = Date.now() - start;
+  // Override res.json to capture response
+  res.json = function (body) {
+    const latencyMs = Date.now() - start;
+    const status = res.statusCode < 400 ? "success" : "error";
 
-      // Determine status from HTTP status code
-      const status = res.statusCode < 400 ? "success" : "error";
+    // Extract tokens from response body
+    const tokensUsed = body?.data?.tokensUsed || 0;
+    const sessionId = body?.data?.sessionId || req.body?.sessionId || null;
+    const model = req.body?.model || "gpt-4o-mini";
+    const errorMessage = status === "error" ? (body?.message || body?.error || "Unknown error") : undefined;
 
-      // Extract tokens and sessionId from response body
-      const tokensUsed = body?.data?.tokensUsed || 0;
-      const sessionId = body?.data?.sessionId || req.body?.sessionId || null;
-      const model = req.body?.model || "gpt-4o-mini"; // Default, can be overridden by controllers
+    // Fire-and-forget logging
+    AILogModel.create({
+      user: req.user?._id,
+      feature,
+      sessionId,
+      model,
+      totalTokens: tokensUsed,
+      latencyMs,
+      status,
+      errorMessage,
+    }).catch((err) => {
+      logger.error(`[AIUsage] Failed to log usage for feature "${feature}":`, err);
+    });
 
-      // Error message if failed
-      const errorMessage = status === "error" ? (body?.message || body?.error || "Unknown error") : undefined;
-
-      // Fire-and-forget logging to avoid blocking response
-      AIUsageModel.create({
-        user: req.user?._id,
-        feature,
-        sessionId,
-        model,
-        totalTokens: tokensUsed,
-        latencyMs,
-        status,
-        errorMessage,
-      }).catch((err) => {
-        logger.error(`[AIUsage] Failed to log usage for feature "${feature}":`, err);
-      });
-
-      // Call original json
-      return originalJson(body);
-    };
-
-    next();
+    return originalJson(body);
   };
+
+  next();
 };
+
+export default { checkAIQuota, recordAIUsage, aiUsageLogger };

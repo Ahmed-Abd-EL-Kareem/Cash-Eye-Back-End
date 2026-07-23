@@ -1,27 +1,71 @@
 import { Router } from "express";
 import * as aiUsageController from "./aiUsage.controller.js";
-import { protect } from "../../middleware/auth.middleware.js";
-import { restrictTo } from "../../middleware/role.middleware.js";
-import { validateCreateAIUsage, validateListUsage, validateUsageStats } from "./aiUsage.validation.js";
+import { authMiddleware } from "../../middleware/auth.middleware.js";
+import { roleMiddleware } from "../../middleware/role.middleware.js";
+import { validate } from "../../middleware/validate.js";
+import * as aiUsageValidation from "./aiUsage.validation.js";
 
 const router = Router();
 
-// Protect all routes under /ai-usage - require authentication
-router.use(protect);
+// Admin-only routes (require admin role)
+router.use(authMiddleware, roleMiddleware("admin"));
 
-// Admin-only routes for listing and stats
-router.get("/", restrictTo("admin"), validateListUsage, aiUsageController.listUsage);
-router.get("/stats", restrictTo("admin"), validateUsageStats, aiUsageController.getUsageStats);
-router.get("/:id", restrictTo("admin"), aiUsageController.getUsageById);
+// Dashboard stats
+router.get("/dashboard", aiUsageController.getDashboardStats);
 
-// Admin-only dashboard & statistics monitoring routes
-router.get("/dashboard", restrictTo("admin"), aiUsageController.getDashboardStats);
-router.get("/recent", restrictTo("admin"), aiUsageController.getRecentLogs);
-router.get("/models", restrictTo("admin"), aiUsageController.getMostUsedModels);
-router.get("/top-users", restrictTo("admin"), aiUsageController.getTopUsers);
-router.get("/top-destinations", restrictTo("admin"), aiUsageController.getTopDestinations);
+// Usage summary (aggregated) - admin
+router.get(
+  "/usage/summary",
+  validate(aiUsageValidation.dateRange),
+  aiUsageController.getUsageSummary
+);
 
-// Endpoint to log AI usage manually/internally
-router.post("/", validateCreateAIUsage, aiUsageController.createUsage);
+// Admin: List AI usage logs with filters
+router.get(
+  "/",
+  validate(aiUsageValidation.listUsage),
+  aiUsageController.listUsage
+);
+
+// Admin: Get usage stats aggregated by feature
+router.get(
+  "/stats",
+  validate(aiUsageValidation.dateRangeOptional),
+  aiUsageController.getUsageStats
+);
+
+// Admin: Get recent logs
+router.get("/recent", aiUsageController.getRecentLogs);
+
+// Admin: Get most used models
+router.get("/models", aiUsageController.getMostUsedModels);
+
+// Admin: Get top users
+router.get("/top-users", aiUsageController.getTopUsers);
+
+// Admin: Get top destinations
+router.get("/top-destinations", aiUsageController.getTopDestinations);
+
+// Admin: Get paginated AI logs
+router.get(
+  "/logs",
+  validate(aiUsageValidation.getLogs),
+  aiUsageController.getLogs
+);
+
+// Admin: Get single log by ID
+router.get("/logs/:logId", aiUsageController.getLogById);
+
+// Legacy route - get usage by ID
+router.get("/:id", aiUsageController.getUsageById);
+
+// User-facing routes (authenticated user)
+router.use(authMiddleware);
+
+// Get current user's AI usage for today
+router.get("/usage/me", aiUsageController.getMyUsage);
+
+// Get current user's AI usage for a date range
+router.get("/usage/me/range", validate(aiUsageValidation.dateRange), aiUsageController.getMyUsageRange);
 
 export default router;

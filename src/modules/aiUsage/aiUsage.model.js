@@ -10,52 +10,38 @@ const aiUsageSchema = new mongoose.Schema(
     },
     feature: {
       type: String,
-      enum: ["chat", "bookingConversation", "hotelAiSearch", "recommendations", "tripPlanner"],
+      enum: [
+        "chat",
+        "bookingConversation",
+        "hotelAiSearch",
+        "recommendations",
+        "tripPlanner",
+      ],
       required: true,
       index: true,
     },
-    sessionId: {
+    date: {
       type: String,
-      index: true,
+      required: true,
+      match: /^\d{4}-\d{2}-\d{2}$/,
     },
-    trip: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Trip",
-      default: null,
-    },
-    model: {
-      type: String,
-      required: [true, "Model name is required"],
-      trim: true,
-    },
-    promptTokens: {
+    tokensUsed: {
       type: Number,
+      required: true,
       default: 0,
+      min: 0,
     },
-    completionTokens: {
+    requestCount: {
       type: Number,
-      default: 0,
-    },
-    totalTokens: {
-      type: Number,
-      default: 0,
+      required: true,
+      default: 1,
+      min: 1,
     },
     cost: {
       type: Number,
+      required: true,
       default: 0,
-    },
-    latencyMs: {
-      type: Number,
-    },
-    status: {
-      type: String,
-      enum: ["success", "error"],
-      default: "success",
-      index: true,
-    },
-    errorMessage: {
-      type: String,
-      default: null,
+      min: 0,
     },
   },
   {
@@ -64,18 +50,16 @@ const aiUsageSchema = new mongoose.Schema(
   }
 );
 
-// ─── Indexes ──────────────────────────────────────────────────────────────────
+// Compound unique index: one document per user+feature+day
+aiUsageSchema.index(
+  { user: 1, feature: 1, date: 1 },
+  { unique: true }
+);
 
-// Compound index for querying user usage sorted by date
-aiUsageSchema.index({ user: 1, createdAt: -1 });
-
-// Index for filtering by feature and date
-aiUsageSchema.index({ feature: 1, createdAt: -1 });
-
-// Single indexes for filtering and statistics
-aiUsageSchema.index({ model: 1 });
-aiUsageSchema.index({ success: 1 });
-aiUsageSchema.index({ createdAt: -1 });
+// Index for date range queries
+aiUsageSchema.index({ date: 1 });
+aiUsageSchema.index({ user: 1, date: -1 });
+aiUsageSchema.index({ feature: 1, date: -1 });
 
 const AIUsageModel = mongoose.model("AIUsage", aiUsageSchema);
 export default AIUsageModel;

@@ -1,118 +1,205 @@
-import * as repo from "./aiUsage.repository.js";
+import {
+  incrementUsage,
+  getUsageToday,
+  getUserUsageRange,
+  getUsageByUser,
+  getUsageByFeature,
+  getDailyUsageTrend,
+  getDashboardStats,
+  createLog,
+  findLogs,
+  findLogById,
+  getRecentLogs,
+  getLogStats,
+} from "./aiUsage.repository.js";
+import { ApiError } from "../../utils/ApiError.js";
 
 /**
- * Calculate the cost of the OpenAI request based on token counts
- * Pricing:
- *   - Input Tokens: $0.40 per 1,000,000 tokens
- *   - Output Tokens: $1.60 per 1,000,000 tokens
- * @param {number} promptTokens 
- * @param {number} completionTokens 
- * @returns {number} Cost in USD rounded to 6 decimals
+ * Check if user has exceeded their AI usage limit for a feature today
+ * @param {Object} params
+ * @param {string} params.userId
+ * @param {string} params.feature
+ * @param {number} params.tokensRequested
+ * @returns {Promise<{ allowed: boolean; usage: Object; limit: number; remaining: number }>}
  */
-export const calculateCost = (promptTokens = 0, completionTokens = 0) => {
-  const inputCost = (promptTokens / 1000000) * 0.40;
-  const outputCost = (completionTokens / 1000000) * 1.60;
-  const totalCost = inputCost + outputCost;
-  return Number(totalCost.toFixed(6));
+export const checkUsageLimit = async ({ userId, feature, tokensRequested = 0 }) => {
+  const usage = await getUsageToday({ userId, feature });
+  const limit = getLimitForFeature(feature);
+  const currentUsage = usage?.tokensUsed || 0;
+  const remaining = Math.max(0, limit - currentUsage);
+  const allowed = currentUsage + tokensRequested <= limit;
+
+  return {
+    allowed,
+    usage: usage || { tokensUsed: 0, requestCount: 0, cost: 0 },
+    limit,
+    remaining,
+    tokensRequested,
+  };
 };
 
 /**
- * Log a new AI request usage in database
- * @param {Object} data 
+ * Get the token limit for a feature based on user's plan
+ * TODO: Integrate with user subscription plan
+ * @param {string} feature
+ * @returns {number}
+ */
+export const getLimitForFeature = (feature) => {
+  const limits = {
+    chat: 50000,
+    bookingConversation: 100000,
+    hotelAiSearch: 30000,
+    recommendations: 20000,
+    tripPlanner: 50000,
+  };
+  return limits[feature] || 10000;
+};
+
+/**
+ * Record AI usage (increment counter) and create detailed log entry
+ * @param {Object} params
  * @returns {Promise<Object>}
  */
-export const createUsage = async (data) => {
-  const promptTokens = data.promptTokens || 0;
-  const completionTokens = data.completionTokens || 0;
+export const recordAiUsage = async ({
+  userId,
+  feature,
+  sessionId,
+  tripId,
+  prompt,
+  response,
+  model,
+  promptTokens,
+  completionTokens,
+  totalTokens,
+  cost,
+  latencyMs,
+  status = "success",
+  errorMessage = null,
+}) => {
+  const [usage, log] = await Promise.all([
+    incrementUsage({
+      userId,
+      feature,
+      tokensUsed: totalTokens,
+      cost,
+    }),
+    createLog({
+      user: userId,
+      feature,
+      sessionId,
+      trip: tripId,
+      prompt,
+      response,
+      model,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      cost,
+      latencyMs,
+      status,
+      errorMessage,
+    }),
+  ]);
 
-  // Auto-calculate totalTokens if not provided
-  if (data.totalTokens === undefined || data.totalTokens === null) {
-    data.totalTokens = promptTokens + completionTokens;
-  }
-
-  // Auto-calculate cost if not provided
-  if (data.cost === undefined || data.cost === null) {
-    data.cost = calculateCost(promptTokens, completionTokens);
-  }
-
-  return repo.createUsage(data);
+  return { usage, log };
 };
 
 /**
- * Get aggregated dashboard statistics
+ * Get current user's AI usage for today across all features
+ * @param {string} userId
+ * @returns {Promise<Array>}
+ */
+export const getMyUsageToday = async (userId) => {
+  const date = new Date().toISOString().split("T")[0];
+  return AIUsageModel.find({ user: userId, date }).lean();
+};
+
+/**
+ * Get current user's AI usage for a date range
+ * @param {Object} params
+ * @param {string} params.userId
+ * @param {string} params.from - YYYY-MM-DD
+ * @param {string} params.to - YYYY-MM-DD
+ * @returns {Promise<Array>}
+ */
+export const getMyUsageRange = async ({ userId, from, to }) => {
+  return getUserUsageRange({ userId, from, to });
+};
+
+/**
+ * Get aggregated usage by user for admin dashboard
+ * @param {Object} params
+ * @param {string} params.from
+ * @param {string} params.to
+ * @returns {Promise<Array>}
+ */
+export const getUsageByUserAggregated = async ({ from, to }) => {
+  return getUsageByUser({ from, to });
+};
+
+/**
+ * Get aggregated usage by feature for admin dashboard
+ * @param {Object} params
+ * @param {string} params.from
+ * @param {string} params.to
+ * @returns {Promise<Array>}
+ */
+export const getUsageByFeatureAggregated = async ({ from, to }) => {
+  return getUsageByFeature({ from, to });
+};
+
+/**
+ * Get daily usage trend for admin dashboard
+ * @param {Object} params
+ * @param {string} params.from
+ * @param {string} params.to
+ * @returns {Promise<Array>}
+ */
+export const getDailyUsageTrendAggregated = async ({ from, to }) => {
+  return getDailyUsageTrend({ from, to });
+};
+
+/**
+ * Get dashboard statistics
  * @returns {Promise<Object>}
  */
-export const getDashboardStats = async () => {
-  return repo.getDashboardStats();
+export const getDashboardStatistics = async () => {
+  return getDashboardStats();
 };
 
 /**
- * Get recent AI request logs
- * @param {number} limit 
- * @returns {Promise<Array>}
- */
-export const getRecentLogs = async (limit) => {
-  return repo.getRecentLogs(limit);
-};
-
-/**
- * Get top users generating the most AI trips
- * @param {number} limit 
- * @returns {Promise<Array>}
- */
-export const getTopUsers = async (limit) => {
-  return repo.getTopUsers(limit);
-};
-
-/**
- * Get most used AI models sorted descending by requests
- * @returns {Promise<Array>}
- */
-export const getMostUsedModels = async () => {
-  return repo.getMostUsedModels();
-};
-
-/**
- * Get top destinations generated by AI
- * @param {number} limit 
- * @returns {Promise<Array>}
- */
-export const getTopDestinations = async (limit) => {
-  return repo.getTopDestinations(limit);
-};
-
-/**
- * List AI usage logs with filtering and pagination
- * @param {Object} options
- * @param {number} options.page
- * @param {number} options.limit
- * @param {string} options.feature
- * @param {string} options.userId
- * @param {string} options.status
- * @param {string} options.from
- * @param {string} options.to
+ * Get paginated AI logs with filters
+ * @param {Object} params
  * @returns {Promise<Object>}
  */
-export const listUsage = async ({ page = 1, limit = 20, feature, userId, status, from, to }) => {
-  return repo.listUsage({ page, limit, feature, userId, status, from, to });
+export const getLogs = async (params) => {
+  return findLogs(params);
 };
 
 /**
- * Get AI usage statistics aggregated by feature
- * @param {Object} options
- * @param {string} options.from
- * @param {string} options.to
- * @returns {Promise<Array>}
- */
-export const getUsageStats = async ({ from, to }) => {
-  return repo.getUsageStats({ from, to });
-};
-
-/**
- * Get a single AI usage log by ID
- * @param {string} id
+ * Get single log by ID
+ * @param {string} logId
  * @returns {Promise<Object|null>}
  */
-export const getUsageById = async (id) => {
-  return repo.getUsageById(id);
+export const getLogById = async (logId) => {
+  return findLogById(logId);
 };
+
+/**
+ * Get recent logs for dashboard
+ * @param {number} limit
+ * @returns {Promise<Array>}
+ */
+export const getRecentAiLogs = async (limit = 10) => {
+  return getRecentLogs(limit);
+};
+
+/**
+ * Get log statistics
+ * @returns {Promise<Object>}
+ */
+export const getLogStatistics = async () => {
+  return getLogStats();
+};
+
+import AIUsageModel from "./aiUsage.model.js";

@@ -250,14 +250,29 @@ export const createBooking = async (userId, data) => {
   const nights = calculateNights(checkIn, checkOut);
   if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
 
-  if (!data.rooms || !Array.isArray(data.rooms) || data.rooms.length === 0) {
+  // Support both new format (rooms array) and legacy format (room + rooms qty + guests)
+  let roomSelections = [];
+  if (data.rooms && Array.isArray(data.rooms) && data.rooms.length > 0) {
+    // New format: rooms: [{ room, quantity, guests: { adults, children } }]
+    roomSelections = data.rooms;
+  } else if (data.room && data.rooms && typeof data.rooms === "number" && data.rooms > 0) {
+    // Legacy format: room (roomId), rooms (quantity), guests (number of adults)
+    const adults = typeof data.guests === "number" ? data.guests : 1;
+    roomSelections = [{
+      room: data.room,
+      quantity: data.rooms,
+      guests: { adults, children: data.children || 0 },
+      roomType: data.roomType || "double",
+      pricePerNight: data.pricePerNight || hotel.averagePricePerNight,
+    }];
+  } else {
     throw new ApiError("At least one room selection is required", 400);
   }
 
   let totalPrice = 0;
   const roomsData = [];
 
-  for (const selection of data.rooms) {
+  for (const selection of roomSelections) {
     const roomDoc = hotel.rooms.id(selection.room);
     if (!roomDoc || !roomDoc.isActive) {
       throw new ApiError(`Room ${selection.room} not found or inactive`, 404);
