@@ -20,8 +20,8 @@ export const chat = asyncHandler(async (req, res) => {
     ? [...result.messages].reverse().find((m) => m.role === "assistant")
     : null;
 
-  await recordAIUsage(req.subscription, {
-    isTripGeneration: false,
+  await recordAIUsage(req, {
+    feature: "chat",
     tokensUsed: assistantMessage?.tokensUsed || 0,
   });
 
@@ -118,8 +118,8 @@ export const searchHotels = asyncHandler(async (req, res) => {
 
   const result = await aiService.searchHotelsService(query, context || {});
 
-  await recordAIUsage(req.subscription, {
-    isTripGeneration: false,
+  await recordAIUsage(req, {
+    feature: "hotelAiSearch",
     tokensUsed: result.tokensUsed || 0,
   });
 
@@ -145,8 +145,8 @@ export const bookingConversation = asyncHandler(async (req, res) => {
 
   const result = await aiService.bookingConversation(message, sessionId, enrichedContext);
 
-  await recordAIUsage(req.subscription, {
-    isTripGeneration: false,
+  await recordAIUsage(req, {
+    feature: "bookingConversation",
     tokensUsed: result.tokensUsed || 0,
   });
 
@@ -222,8 +222,8 @@ export const getRecommendations = asyncHandler(async (req, res) => {
 
   const result = await aiService.getRecommendations(req.user._id, parsedContext);
 
-  await recordAIUsage(req.subscription, {
-    isTripGeneration: false,
+  await recordAIUsage(req, {
+    feature: "recommendations",
     tokensUsed: result.tokensUsed || 0,
   });
 
