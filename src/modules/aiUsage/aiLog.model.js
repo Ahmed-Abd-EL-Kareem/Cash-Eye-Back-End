@@ -22,7 +22,6 @@ const aiLogSchema = new mongoose.Schema(
     },
     sessionId: {
       type: String,
-      index: true,
     },
     trip: {
       type: mongoose.Schema.Types.ObjectId,

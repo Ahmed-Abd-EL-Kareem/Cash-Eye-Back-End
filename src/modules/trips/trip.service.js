@@ -535,7 +535,7 @@ import UserModel from "../users/user.model.js";
 import ApiError from "../../utils/apiError.js";
 import APIFeatures from "../../utils/apiFeature.js";
 import { generateTripPlan } from "../../integrations/langchain/tripPlanner.ai.js";
-import { createUsage } from "../aiUsage/aiUsage.service.js";
+import { recordAiUsage } from "../aiUsage/aiUsage.service.js";
 
 // ─── Generate + save AI trip ──────────────────────────────────────────────────
 export const generateAndSaveTrip = async (userId, params) => {
@@ -586,15 +586,21 @@ export const generateAndSaveTrip = async (userId, params) => {
     const responseTime = Date.now() - start;
 
     // Log success AI Usage
-    await createUsage({
-      user: userId,
-      trip: trip._id,
+    await recordAiUsage({
+      userId,
+      feature: "tripPlanner",
+      sessionId: null,
+      tripId: trip._id,
+      prompt: null,
+      response: null,
       model: aiResult.rawResponse?.model || "openai/gpt-oss-120b",
       promptTokens: aiResult.rawResponse?.usage?.prompt_tokens || 0,
       completionTokens: aiResult.rawResponse?.usage?.completion_tokens || 0,
       totalTokens: aiResult.rawResponse?.usage?.total_tokens || 0,
-      responseTime,
-      success: true,
+      cost: 0,
+      latencyMs: responseTime,
+      status: "success",
+      errorMessage: null,
     });
 
     return { trip, tokensUsed: aiResult.tokensUsed };
@@ -602,15 +608,20 @@ export const generateAndSaveTrip = async (userId, params) => {
     const responseTime = Date.now() - start;
 
     // Log failure AI Usage
-    await createUsage({
-      user: userId,
-      trip: null,
-      model: "openai/gpt-oss-120b", // default fallback model
+    await recordAiUsage({
+      userId,
+      feature: "tripPlanner",
+      sessionId: null,
+      tripId: null,
+      prompt: null,
+      response: null,
+      model: "openai/gpt-oss-120b",
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,
-      responseTime,
-      success: false,
+      cost: 0,
+      latencyMs: responseTime,
+      status: "error",
       errorMessage: error.message || "Failed to generate AI trip plan",
     });
 

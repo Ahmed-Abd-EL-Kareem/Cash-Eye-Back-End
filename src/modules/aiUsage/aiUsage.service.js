@@ -12,7 +12,8 @@ import {
   getRecentLogs,
   getLogStats,
 } from "./aiUsage.repository.js";
-import { ApiError } from "../../utils/ApiError.js";
+import AIUsageModel from "./aiUsage.model.js";
+import ApiError from "../../utils/apiError.js";
 
 /**
  * Check if user has exceeded their AI usage limit for a feature today
@@ -201,5 +202,3 @@ export const getRecentAiLogs = async (limit = 10) => {
 export const getLogStatistics = async () => {
   return getLogStats();
 };
-
-import AIUsageModel from "./aiUsage.model.js";

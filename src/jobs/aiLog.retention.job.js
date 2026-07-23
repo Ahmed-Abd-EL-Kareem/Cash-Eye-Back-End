@@ -3,7 +3,7 @@
 
 import { CronJob } from "cron";
 import AILogModel from "../modules/aiUsage/aiLog.model.js";
-import { logger } from "../config/logger.js";
+import logger from "../config/logger.js";
 
 /**
  * Archive logs older than retentionDays to cold storage

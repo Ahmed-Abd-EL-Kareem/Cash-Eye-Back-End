@@ -14,7 +14,7 @@ import {
 } from "../../integrations/langchain/chatConversation.service.js";
 import { generateTripPlan } from "../../integrations/langchain/tripPlanner.ai.js";
 import ApiError from "../../utils/apiError.js";
-import { getDashboardStats } from "../aiUsage/aiUsage.service.js";
+import { getDashboardStatistics as getDashboardStats } from "../aiUsage/aiUsage.service.js";
 import * as hotelService from "../hotels/hotel.service.js";
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────

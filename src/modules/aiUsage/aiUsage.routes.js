@@ -1,14 +1,14 @@
 import { Router } from "express";
 import * as aiUsageController from "./aiUsage.controller.js";
-import { authMiddleware } from "../../middleware/auth.middleware.js";
-import { roleMiddleware } from "../../middleware/role.middleware.js";
-import { validate } from "../../middleware/validate.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { restrictTo } from "../../middleware/role.middleware.js";
+import { validate } from "../../middleware/validate.middleware.js";
 import * as aiUsageValidation from "./aiUsage.validation.js";
 
 const router = Router();
 
 // Admin-only routes (require admin role)
-router.use(authMiddleware, roleMiddleware("admin"));
+router.use(protect, restrictTo("admin"));
 
 // Dashboard stats
 router.get("/dashboard", aiUsageController.getDashboardStats);
@@ -60,7 +60,7 @@ router.get("/logs/:logId", aiUsageController.getLogById);
 router.get("/:id", aiUsageController.getUsageById);
 
 // User-facing routes (authenticated user)
-router.use(authMiddleware);
+router.use(protect);
 
 // Get current user's AI usage for today
 router.get("/usage/me", aiUsageController.getMyUsage);

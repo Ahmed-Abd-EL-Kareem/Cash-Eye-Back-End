@@ -1,5 +1,5 @@
 import Joi from "joi";
-import { ApiError } from "../utils/ApiError.js";
+import ApiError from "../utils/ApiError.js";
 
 /**
  * Validation middleware factory

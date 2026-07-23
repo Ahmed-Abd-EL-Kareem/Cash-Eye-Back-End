@@ -4,8 +4,8 @@
 import AIUsageModel from "../modules/aiUsage/aiUsage.model.js";
 import AILogModel from "../modules/aiUsage/aiLog.model.js";
 import SubscriptionModel from "../modules/subscriptions/subscription.model.js";
-import { logger } from "../config/logger.js";
-import { ApiError } from "../utils/ApiError.js";
+import logger from "../config/logger.js";
+import ApiError from "../utils/ApiError.js";
 
 /**
  * Check if user has exceeded their AI usage quota
@@ -197,7 +197,7 @@ export const recordAIUsage = async (req, params) => {
  * @param {string} feature - Feature name
  * @returns {Function} Express middleware
  */
-export const aiUsageLogger = (feature) => async (req, res, next) => {
+export const aiUsageMiddleware = (feature) => async (req, res, next) => {
   const start = Date.now();
 
   // Store original json method
@@ -234,4 +234,4 @@ export const aiUsageLogger = (feature) => async (req, res, next) => {
   next();
 };
 
-export default { checkAIQuota, recordAIUsage, aiUsageLogger };
+export default { checkAIQuota, recordAIUsage, aiUsageMiddleware };
