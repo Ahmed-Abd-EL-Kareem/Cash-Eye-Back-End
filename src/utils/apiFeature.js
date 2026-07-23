@@ -66,7 +66,8 @@ class APIFeatures {
   }
 
   async countDocuments() {
-    return this.model.countDocuments(this.filterQuery);
+    const filter = this.query.getFilter ? this.query.getFilter() : this.filterQuery;
+    return this.model.countDocuments(filter);
   }
 }
 
