@@ -20,7 +20,7 @@ export const incrementUsage = async ({ userId, feature, tokensUsed, cost = 0 }) 
       $inc: { tokensUsed, requestCount: 1, cost },
       $setOnInsert: { user: userId, feature, date },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 };
 

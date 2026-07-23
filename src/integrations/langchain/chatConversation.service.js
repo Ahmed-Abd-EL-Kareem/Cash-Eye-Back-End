@@ -137,7 +137,7 @@ export const renameChatConversation = async (sessionId, userId, title) => {
   const conversation = await ChatConversation.findOneAndUpdate(
     { sessionId, user: userId },
     { title: title.trim().slice(0, 100) },
-    { new: true }
+    { returnDocument: "after" }
   );
   return conversation;
 };

@@ -143,7 +143,7 @@ export const recordAIUsage = async (req, params) => {
         $inc: { tokensUsed: totalTokens, requestCount: 1, cost },
         $setOnInsert: { user: req.user._id, feature, date },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
     // Update subscription usage
