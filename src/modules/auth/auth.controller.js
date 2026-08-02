@@ -5,6 +5,7 @@ import {
   verifyOTP,
   resetPassword,
   googleCallback,
+  googleMobileAuth as googleMobileAuthService,
   logout,
 } from "./auth.service.js";
 
@@ -20,4 +21,7 @@ export const resetPass = (req, res, next) => resetPassword(req, res, next);
 
 export const googleAuthCallback = (req, res, next) => googleCallback(req, res, next);
 
+export const googleMobileAuth = (req, res, next) => googleMobileAuthService(req, res, next);
+
 export const logoutUser = (req, res, next) => logout(req, res, next);
+

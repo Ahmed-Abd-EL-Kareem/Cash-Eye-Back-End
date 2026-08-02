@@ -1,6 +1,7 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import UserModel from "../modules/users/user.model.js";
+import { findOrCreateGoogleUser } from "../modules/auth/auth.service.js";
 
 const googleConfigured =
   process.env.GOOGLE_CLIENT_ID &&
@@ -16,39 +17,23 @@ if (googleConfigured) {
         callbackURL: process.env.GOOGLE_REDIRECT_URL,
       },
       async (accessToken, refreshToken, profile, done) => {
-      try {
-        const email = profile.emails?.[0]?.value;
-        if (!email) return done(new Error("No email returned from Google"), null);
+        try {
+          const email = profile.emails?.[0]?.value;
+          if (!email) return done(new Error("No email returned from Google"), null);
 
-        const googlePhotoUrl = profile.photos?.[0]?.value || null;
+          const googlePhotoUrl = profile.photos?.[0]?.value || null;
 
-        let user = await UserModel.findOne({ email });
-
-        if (!user) {
-          user = await UserModel.createWithSubscription({
-            name: profile.displayName,
+          const user = await findOrCreateGoogleUser({
             email,
             googleId: profile.id,
-            image: googlePhotoUrl,
-            provider: "google",
+            displayName: profile.displayName,
+            photoUrl: googlePhotoUrl,
           });
-        } else {
-          let changed = false;
-          if (!user.googleId) {
-            user.googleId = profile.id;
-            changed = true;
-          }
-          if (!user.image && googlePhotoUrl) {
-            user.image = googlePhotoUrl;
-            changed = true;
-          }
-          if (changed) await user.save({ validateBeforeSave: false });
-        }
 
-        return done(null, user);
-      } catch (err) {
-        return done(err, null);
-      }
+          return done(null, user);
+        } catch (err) {
+          return done(err, null);
+        }
       }
     )
   );

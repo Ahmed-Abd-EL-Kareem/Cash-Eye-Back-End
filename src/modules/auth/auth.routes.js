@@ -11,6 +11,8 @@ router.post("/reset-password", AuthController.resetPass);
 router.post("/login", AuthController.loginUser);
 router.post("/logout", AuthController.logoutUser);
 
+router.post("/google/mobile", AuthController.googleMobileAuth);
+
 router.get(
   "/google",
   passport.authenticate("google", {
