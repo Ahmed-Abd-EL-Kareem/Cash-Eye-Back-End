@@ -7,7 +7,13 @@ import { recordAIUsage } from "../../middleware/aiUsage.middleware.js";
 // POST /api/v1/ai/chat
 // Body: { message: "string", sessionId: "string (optional)" }
 export const chat = asyncHandler(async (req, res) => {
-  const { message, sessionId } = req.body;
+  let { message, sessionId } = req.body;
+
+  // Back-compat: accept a full messages[] array and use the last user message
+  if (!message && Array.isArray(req.body.messages)) {
+    const lastUserMsg = [...req.body.messages].reverse().find((m) => m.role === "user");
+    message = lastUserMsg?.content;
+  }
 
   if (!message) {
     throw new ApiError("message is required", 400);
