@@ -33,7 +33,13 @@ export const chat = asyncHandler(async (req, res) => {
 
   successResponse(res, {
     message: "Chat response generated",
-    data: result,
+    data: {
+      sessionId: result.sessionId,
+      title: result.title,
+      messages: result.messages,
+      reply: assistantMessage?.content || "",
+      tokensUsed: assistantMessage?.tokensUsed || 0,
+    },
   });
 });
 
