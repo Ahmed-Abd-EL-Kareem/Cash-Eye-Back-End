@@ -90,6 +90,67 @@ export const createBookingCheckoutSession = async (bookingId, userId, currency) 
   };
 };
 
+export const createBookingPaymentIntent = async (bookingId, userId, currency) => {
+  const booking = await BookingModel.findById(bookingId);
+  if (!booking) throw new ApiError("Booking not found", 404);
+  if (booking.user.toString() !== userId.toString()) {
+    throw new ApiError("Not authorized to pay for this booking", 403);
+  }
+  if (booking.paymentStatus === "succeeded") {
+    throw new ApiError("Payment already processed for this booking", 400);
+  }
+  if (booking.status === "canceled") {
+    throw new ApiError("Cannot pay for a canceled booking", 400);
+  }
+
+  const user = await UserModel.findById(userId).select("email name stripeCustomerId");
+  let customerId = user?.stripeCustomerId;
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: user?.email,
+      name: user?.name,
+      metadata: { userId: userId.toString() },
+    });
+    customerId = customer.id;
+    if (user) {
+      user.stripeCustomerId = customerId;
+      await user.save({ validateBeforeSave: false });
+    }
+  }
+
+  const ephemeralKey = await stripe.ephemeralKeys.create(
+    { customer: customerId },
+    { apiVersion: "2024-11-20.acacia" }
+  );
+
+  const payCurrency = (currency || booking.currency || "EGP").toLowerCase();
+  const amount = Math.round(booking.totalPrice * 100);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: payCurrency,
+    customer: customerId,
+    metadata: {
+      bookingId: booking._id.toString(),
+      userId: userId.toString(),
+    },
+    description: `Rahal Booking #${booking._id.toString().slice(0, 8)}`,
+  });
+
+  booking.paymentStatus = "processing";
+  booking.stripePaymentIntentId = paymentIntent.id;
+  await booking.save();
+
+  return {
+    paymentIntentClientSecret: paymentIntent.client_secret,
+    ephemeralKeySecret: ephemeralKey.secret,
+    customerId,
+    amount,
+    currency: payCurrency,
+    bookingId: booking._id,
+  };
+};
+
 export const handleWebhookEvent = async (payload, sig) => {
   let event;
   try {

@@ -22,6 +22,25 @@ export const upgradeSubscription = asyncHandler(async (req, res) => {
   });
 });
 
+export const createSubscriptionPaymentIntent = asyncHandler(async (req, res) => {
+  const { planName, currency } = req.body;
+
+  if (!planName) {
+    throw new ApiError("planName is required", 400);
+  }
+
+  const result = await subscriptionPaymentService.createSubscriptionPaymentIntent(
+    req.user._id,
+    planName,
+    currency
+  );
+
+  createdResponse(res, {
+    message: "Subscription payment intent created successfully",
+    data: result,
+  });
+});
+
 export const handleSubscriptionWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const payload = getStripeWebhookPayload(req);

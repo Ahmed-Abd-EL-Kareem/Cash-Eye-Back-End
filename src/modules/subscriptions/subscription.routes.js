@@ -57,6 +57,8 @@ router.patch("/cancel", subscriptionController.cancelSubscription); // ←
 
 // ── Payment routes ─────────────────────────────────────────────────────────────
 router.post("/pay/upgrade", subscriptionPaymentController.upgradeSubscription);
+router.post("/pay/intent", subscriptionPaymentController.createSubscriptionPaymentIntent);
+router.post("/intent", subscriptionPaymentController.createSubscriptionPaymentIntent);
 router.get("/pay/status/:subscriptionId", subscriptionPaymentController.getSubscriptionPaymentStatus);
 
 router.use(restrictTo("admin"));

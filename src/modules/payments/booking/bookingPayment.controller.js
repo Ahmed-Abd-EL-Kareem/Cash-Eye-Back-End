@@ -12,6 +12,14 @@ export const createBookingCheckout = asyncHandler(async (req, res) => {
   createdResponse(res, { message: "Booking checkout session created", data: result });
 });
 
+export const createBookingPaymentIntent = asyncHandler(async (req, res) => {
+  const { bookingId, currency } = req.body;
+  if (!bookingId) throw new ApiError("bookingId is required", 400);
+
+  const result = await bookingPaymentService.createBookingPaymentIntent(bookingId, req.user._id, currency);
+  createdResponse(res, { message: "Booking payment intent created", data: result });
+});
+
 export const createHoldCheckout = asyncHandler(async (req, res) => {
   const { holdId, currency } = req.body;
   if (!holdId) throw new ApiError("holdId is required", 400);

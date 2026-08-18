@@ -207,13 +207,77 @@ export const createSubscriptionCheckoutSession = async (userId, planName) => {
 //     throw new ApiError("Not authorized for this checkout session", 403);
 //   }
 //
-//   const subscription = await fulfillSubscriptionFromCheckout(session);
-//   if (!subscription) {
-//     throw new ApiError("Failed to apply subscription upgrade", 500);
-//   }
-//
-//   return subscription.populate("plan", "name displayName price limits features");
-// };
+export const createSubscriptionPaymentIntent = async (userId, planName, currency) => {
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new ApiError("User not found", 404);
+  }
+
+  const plan = await PlanModel.findOne({ name: planName, isActive: true });
+  if (!plan) {
+    throw new ApiError("Plan not found or inactive", 404);
+  }
+
+  if (planName === "free") {
+    throw new ApiError("No payment required for free plan", 400);
+  }
+
+  const subscription = await SubscriptionModel.findOne({ user: userId });
+  if (!subscription) {
+    throw new ApiError("Subscription not found", 404);
+  }
+
+  if (subscription.planName === planName && subscription.status === "active") {
+    throw new ApiError(`Already on ${planName} plan`, 400);
+  }
+
+  let customerId = subscription.stripeCustomerId || user.stripeCustomerId;
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: user.email,
+      name: user.name,
+      metadata: { userId: user._id.toString() },
+    });
+    customerId = customer.id;
+    subscription.stripeCustomerId = customerId;
+    user.stripeCustomerId = customerId;
+    await Promise.all([subscription.save(), user.save({ validateBeforeSave: false })]);
+  }
+
+  const ephemeralKey = await stripe.ephemeralKeys.create(
+    { customer: customerId },
+    { apiVersion: "2024-11-20.acacia" }
+  );
+
+  const payCurrency = (currency || "USD").toLowerCase();
+  const amount = Math.round((plan.price || 19) * 100);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: payCurrency,
+    customer: customerId,
+    metadata: {
+      userId: user._id.toString(),
+      subscriptionId: subscription._id.toString(),
+      planName,
+      type: "subscription_upgrade",
+    },
+    description: `Rahal ${plan.displayName || planName} Plan Subscription`,
+  });
+
+  subscription.stripePaymentIntentId = paymentIntent.id;
+  await subscription.save();
+
+  return {
+    paymentIntentClientSecret: paymentIntent.client_secret,
+    ephemeralKeySecret: ephemeralKey.secret,
+    customerId,
+    amount,
+    currency: payCurrency,
+    subscriptionId: subscription._id,
+    planName,
+  };
+};
 
 export const handleSubscriptionWebhookEvent = async (payload, sig) => {
   let event;
@@ -234,6 +298,34 @@ export const handleSubscriptionWebhookEvent = async (payload, sig) => {
     case "checkout.session.completed":
       await fulfillSubscriptionFromCheckout(event.data.object);
       break;
+    case "payment_intent.succeeded": {
+      const pi = event.data.object;
+      if (pi.metadata?.type === "subscription_upgrade" || pi.metadata?.subscriptionId) {
+        const { userId, subscriptionId, planName } = pi.metadata;
+        const sub = await SubscriptionModel.findById(subscriptionId);
+        if (sub) {
+          const plan = await PlanModel.findOne({ name: planName });
+          if (sub.planName !== planName) {
+            sub.history.push({
+              fromPlan: sub.planName,
+              toPlan: planName,
+              reason: "stripe_payment_intent",
+            });
+          }
+          sub.stripePaymentIntentId = pi.id;
+          sub.planName = planName;
+          sub.status = "active";
+          sub.startDate = new Date();
+          if (plan) sub.plan = plan._id;
+          await sub.save();
+          if (userId) {
+            await UserModel.findByIdAndUpdate(userId, { subscription: sub._id });
+          }
+          logger.info(`[Stripe] Subscription upgraded via PaymentIntent to ${planName} for user ${userId || sub.user}`);
+        }
+      }
+      break;
+    }
     case "customer.subscription.created":
       await handleSubscriptionCreated(event.data.object);
       break;

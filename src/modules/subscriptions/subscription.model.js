@@ -127,6 +127,7 @@ const subscriptionSchema = new mongoose.Schema(
     // Stripe fields
     stripeCustomerId: { type: String, unique: true, sparse: true },
     stripeSubscriptionId: { type: String, unique: true, sparse: true },
+    stripePaymentIntentId: { type: String, sparse: true },
 
     usage: {
       tokensUsedThisMonth: { type: Number, default: 0 },

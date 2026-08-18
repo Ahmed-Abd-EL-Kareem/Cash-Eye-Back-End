@@ -82,6 +82,10 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subscription",
     },
+    stripeCustomerId: {
+      type: String,
+      sparse: true,
+    },
     savedTrips: [{ type: mongoose.Schema.Types.ObjectId, ref: "Trip" }],
     otp: String,
     resetOTPExpiration: Date,
