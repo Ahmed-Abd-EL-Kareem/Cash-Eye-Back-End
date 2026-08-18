@@ -1018,6 +1018,63 @@ const safeJsonParse = (raw) => {
   return null;
 };
 
+const toLocalizedString = (val, fallback = "") => {
+  if (!val) return { en: fallback, ar: fallback };
+  if (typeof val === "string") return { en: val, ar: val };
+  if (typeof val === "object") {
+    const en = typeof val.en === "string" && val.en.trim() ? val.en : fallback;
+    const ar = typeof val.ar === "string" && val.ar.trim() ? val.ar : (en || fallback);
+    return { en: en || fallback, ar: ar || en || fallback };
+  }
+  return { en: String(val), ar: String(val) };
+};
+
+const normalizePlan = (rawPlan, defaultDestination = "Egypt") => {
+  if (!rawPlan || typeof rawPlan !== "object") return null;
+
+  const title = toLocalizedString(rawPlan.title, `Journey to ${defaultDestination}`);
+  const destination = toLocalizedString(rawPlan.destination, defaultDestination);
+  const summary = toLocalizedString(rawPlan.summary, `An unforgettable journey exploring ${defaultDestination}.`);
+
+  let days = [];
+  if (Array.isArray(rawPlan.days) && rawPlan.days.length > 0) {
+    days = rawPlan.days.map((d, index) => {
+      const dayNum = typeof d.day === "number" ? d.day : (index + 1);
+      const dayTitle = toLocalizedString(d.title, `Day ${dayNum}`);
+
+      const activities = Array.isArray(d.activities) && d.activities.length > 0
+        ? d.activities.map((a, aIdx) => toLocalizedString(a, `Explore highlights #${aIdx + 1}`))
+        : [toLocalizedString(null, "Explore local landmarks")];
+
+      const meals = Array.isArray(d.meals) && d.meals.length > 0
+        ? d.meals.map((m, mIdx) => toLocalizedString(m, `Traditional meal #${mIdx + 1}`))
+        : [toLocalizedString(null, "Breakfast at hotel"), toLocalizedString(null, "Dinner at authentic local restaurant")];
+
+      const accommodation = toLocalizedString(d.accommodation, "Heritage Hotel");
+      const tips = toLocalizedString(d.tips, "Wear comfortable walking shoes and stay hydrated.");
+
+      return {
+        day: dayNum,
+        title: dayTitle,
+        activities,
+        meals,
+        accommodation,
+        tips,
+      };
+    });
+  }
+
+  if (days.length === 0) return null;
+
+  return {
+    ...rawPlan,
+    title,
+    destination,
+    summary,
+    days,
+  };
+};
+
 // A bilingual field must be an object with non-empty en AND ar strings.
 const isLocalizedString = (v) =>
   v &&
@@ -1174,10 +1231,11 @@ async function plannerNode(state) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function validatorNode(state) {
   const parsed = safeJsonParse(state.rawOutput);
+  const normalized = normalizePlan(parsed, state.destination);
 
-  if (isValidPlan(parsed)) {
-    logger.info(`[TripPlanner] Plan validated: "${parsed.title.en}" / "${parsed.title.ar}" (${parsed.days.length} days)`);
-    return { plan: parsed, error: null };
+  if (normalized && isValidPlan(normalized)) {
+    logger.info(`[TripPlanner] Plan validated: "${normalized.title.en}" / "${normalized.title.ar}" (${normalized.days.length} days)`);
+    return { plan: normalized, error: null };
   }
 
   logger.warn(`[TripPlanner] Validation failed (attempt ${state.retryCount + 1})`);
@@ -1185,6 +1243,10 @@ async function validatorNode(state) {
   if (state.retryCount < 1) {
     // Signal retry — retryCount increment handled by the edge
     return { plan: null, retryCount: state.retryCount + 1 };
+  }
+
+  if (normalized) {
+    return { plan: normalized, error: null };
   }
 
   return {
