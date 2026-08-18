@@ -15,6 +15,7 @@ import { stripeWebhookBodyParser } from "./src/middleware/stripeWebhook.middlewa
 import { globalErrorHandler } from "./src/middleware/error.middleware.js";
 import ApiError from "./src/utils/apiError.js";
 import apiRoutes from "./src/routes/index.js";
+import connectDB from "./src/config/db.js";
 const app = express();
 app.set("trust proxy", 1);
 if (process.env.NODE_ENV === "development") {
@@ -61,7 +62,7 @@ app.use(hpp());
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || "rahal_super_secret_session_key",
     resave: false,
     saveUninitialized: false,
   })
@@ -69,6 +70,20 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Ensure database connection is ready before handling requests in serverless environments
+app.use(async (req, res, next) => {
+  if (req.path === "/health") {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("[Database] Connection failed:", err.message);
+    next(new ApiError(`Database connection failed: ${err.message}`, 500));
+  }
+});
 
 app.use("/api", globalLimiter);
 app.use("/api/v1", apiRoutes);
