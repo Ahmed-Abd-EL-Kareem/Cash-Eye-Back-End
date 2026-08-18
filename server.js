@@ -8,18 +8,29 @@ import "./src/jobs/aiLog.retention.job.js";
 
 const port = process.env.PORT || 3000;
 
-const startServer = async () => {
-  try {
-    await connectDB();
-    await seedPlans();
-
-    app.listen(port, () => {
-      console.log(`Rahal API running at http://localhost:${port}`);
-    });
-  } catch (err) {
-    console.error("Failed to start server:", err);
-    process.exit(1);
+let dbPromise = null;
+const init = async () => {
+  if (!dbPromise) {
+    dbPromise = Promise.all([connectDB(), seedPlans()]);
   }
+  return dbPromise;
 };
 
-startServer();
+if (!process.env.VERCEL) {
+  init()
+    .then(() => {
+      app.listen(port, () => {
+        console.log(`Rahal API running at http://localhost:${port}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to start server:", err);
+      process.exit(1);
+    });
+} else {
+  init().catch((err) => {
+    console.error("Vercel initialization error:", err);
+  });
+}
+
+export default app;
