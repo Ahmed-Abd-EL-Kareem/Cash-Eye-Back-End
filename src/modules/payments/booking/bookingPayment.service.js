@@ -32,12 +32,16 @@ export const createBookingCheckoutSession = async (bookingId, userId, currency) 
 
   const hotel = booking.hotel;
   const trip = booking.trip;
-  const hotelName = hotel?.name?.en || hotel?.name || "Hotel booking";
+  const hotelName = hotel?.name?.en || (typeof hotel?.name === 'string' ? hotel.name : "Hotel booking");
   const hotelImages = (hotel?.coverImage ? [hotel.coverImage] : []).concat(hotel?.images || []).filter(Boolean).slice(0, 8);
+  const tripTitle = trip ? (trip.title?.en || (typeof trip.title === 'string' ? trip.title : "Egypt Trip")) : "";
 
-  const productName = trip
-    ? `${hotelName} + Trip: ${trip.title}`
+  const productName = tripTitle
+    ? `${hotelName} + Trip: ${tripTitle}`
     : `Hotel — ${hotelName}`;
+
+  const roomCount = Array.isArray(booking.rooms) ? booking.rooms.reduce((s, r) => s + (r.quantity || 1), 0) : (booking.rooms || 1);
+  const guestCount = typeof booking.guests === 'number' ? booking.guests : (Array.isArray(booking.rooms) ? booking.rooms.reduce((s, r) => s + (r.guests?.adults || 1) + (r.guests?.children || 0), 0) : 2);
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -49,27 +53,27 @@ export const createBookingCheckoutSession = async (bookingId, userId, currency) 
           unit_amount: amount,
           product_data: {
             name: productName,
-            description: `${new Date(booking.checkIn).toLocaleDateString()} - ${new Date(booking.checkOut).toLocaleDateString()} | ${booking.guests} guests | ${booking.rooms} rooms`,
+            description: `${new Date(booking.checkIn).toLocaleDateString()} - ${new Date(booking.checkOut).toLocaleDateString()} | ${guestCount} guests | ${roomCount} rooms`,
             ...(hotelImages.length ? { images: hotelImages } : {}),
           },
         },
         quantity: 1,
       },
     ],
-    success_url: `${process.env.CLIENT_URL}/booking/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
-    cancel_url: `${process.env.CLIENT_URL}/booking/payment/cancel?booking_id=${booking._id}`,
+    success_url: `${process.env.CLIENT_URL || 'https://rahal.app'}/booking/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
+    cancel_url: `${process.env.CLIENT_URL || 'https://rahal.app'}/booking/payment/cancel?booking_id=${booking._id}`,
     metadata: {
       bookingId: booking._id.toString(),
       userId: userId.toString(),
       hotelName,
-      tripTitle: trip?.title || "",
+      tripTitle,
     },
     payment_intent_data: {
       metadata: {
         bookingId: booking._id.toString(),
         userId: userId.toString(),
       },
-      description: `Rahal booking — ${hotelName}${trip ? ` + ${trip.title}` : ""}`.slice(0, 200),
+      description: `Rahal booking — ${hotelName}${tripTitle ? ` + ${tripTitle}` : ""}`.slice(0, 200),
     },
   });
 

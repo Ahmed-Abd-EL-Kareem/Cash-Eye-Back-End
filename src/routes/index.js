@@ -21,6 +21,7 @@ router.use("/bookings", bookingRouter);
 router.use("/trips", tripRouter);
 router.use("/ai", aiRouter);
 router.use("/payments", bookingPaymentRoutes);
+router.use("/payments/booking", bookingPaymentRoutes);
 router.use("/ai-usage", aiUsageRouter);
 
 export default router;
