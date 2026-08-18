@@ -39,7 +39,10 @@ router.patch("/admin/:id/status", restrictTo("admin"), bookingController.adminUp
 
 // ─── Payments (Booking) ───────────────────────────────────────────────────────
 router.post("/pay/checkout", bookingPaymentController.createBookingCheckout);
+router.post("/checkout", bookingPaymentController.createBookingCheckout);
+router.post("/pay", bookingPaymentController.createBookingCheckout);
 router.post("/webhook", bookingPaymentController.handleWebhook);
 router.get("/pay/status/:bookingId", bookingPaymentController.getPaymentStatus);
+router.get("/status/:bookingId", bookingPaymentController.getPaymentStatus);
 
 export default router;
