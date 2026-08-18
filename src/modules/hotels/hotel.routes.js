@@ -11,10 +11,11 @@ const router = Router();
 
 // Public
 router.get("/", hotelController.getHotels);
-
 router.get("/nearby", hotelController.getNearbyHotels);
-
 router.get("/slug/:slug", hotelController.getHotelBySlug);
+router.get("/meta", hotelController.getHotelMeta);
+router.get("/top", hotelController.getTopHotels);
+router.get("/:id", validateObjectId("id"), hotelController.getHotel);
 
 // Availability endpoints (public - no auth)
 router.get(
@@ -34,15 +35,8 @@ router.get(
 // Admin
 router.use(protect, restrictTo("admin"));
 router.get("/admin/stats", hotelController.getHotelStats);
-router.get("/top", hotelController.getTopHotels);
-
-router.get("/:id", validateObjectId("id"), hotelController.getHotel);
-router.get("/meta", hotelController.getHotelMeta);
-
 router.post("/", validateCreateHotel, hotelController.createHotel);
-
 router.patch("/:id", validateObjectId("id"), hotelController.updateHotel);
-
 router.delete("/:id", validateObjectId("id"), hotelController.deleteHotel);
 
 export default router;
