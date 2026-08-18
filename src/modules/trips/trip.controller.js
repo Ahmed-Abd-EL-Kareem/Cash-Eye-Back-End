@@ -36,11 +36,6 @@ export const generateTrip = asyncHandler(async (req, res) => {
     }
   );
 
-  await recordAIUsage(req, {
-    feature: "tripGeneration",
-    tokensUsed: result.tokensUsed || 0,
-  });
-
   createdResponse(res, {
     message: "Trip generated successfully",
     tokensUsed: result.tokensUsed,
