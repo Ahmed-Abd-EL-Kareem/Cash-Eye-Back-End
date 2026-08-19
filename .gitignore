@@ -12,7 +12,7 @@ pnpm-debug.log*
 # =========================
 .env
 .env.*
-.env.example
+!.env.example
 
 # =========================
 # Logs
@@ -76,14 +76,12 @@ coverage/
 # Misc
 # =========================
 *.env.local
-*.env.example
 *.env.development.local
 *.env.test.local
 *.env.production.local
 *.development.env
 *.md
 !README.md
-.env.example
 *.prettierrc
 *.kilo
 *.opencode
