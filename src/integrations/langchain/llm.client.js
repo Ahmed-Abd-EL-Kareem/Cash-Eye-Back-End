@@ -40,9 +40,9 @@ export const structuredLLM = new ChatOpenAI({
   },
 });
 
-// Booking agent uses Llama — keeps JSON compliance higher
+// Booking agent uses fast Nemotron 120B model
 export const bookingLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-ultra-550b-a55b",
+  model: "nvidia/nemotron-3-super-120b-a12b",
   temperature: 0.6,
   maxTokens: 1500,
   apiKey: process.env.NVIDIA_API_KEY,
@@ -53,9 +53,9 @@ export const bookingLLM = new ChatOpenAI({
   },
 });
 
-// Trip planner needs more tokens for full itineraries
+// Trip planner uses fast Nemotron 120B model for high throughput
 export const tripLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-ultra-550b-a55b",
+  model: "nvidia/nemotron-3-super-120b-a12b",
   temperature: 0.6,
   maxTokens: 3000,
   apiKey: process.env.NVIDIA_API_KEY,
