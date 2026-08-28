@@ -79,21 +79,19 @@ export const tripLLM = new ChatOpenAI({
 //   },
 // });
 
-// ── Embedding model (NVIDIA nv-embedqa-e5-v5, 1024-dim, matches the Upstash index) ──
+// ── Embedding model (NVIDIA llama-nemotron-embed-1b-v2, 1024-dim, matches the Upstash index) ──
 // Used by the RAG retriever — NOT the chat models.
 //
-// nv-embedqa-e5-v5 is an asymmetric retrieval model: NVIDIA's API requires
+// llama-nemotron-embed-1b-v2 is an asymmetric retrieval model: NVIDIA's API requires
 // `input_type` ("query" for search terms, "passage" for indexed documents)
-// or retrieval quality drops significantly. LangChain's OpenAIEmbeddings
-// wrapper doesn't expose that field, so we call the OpenAI-compatible
-// NVIDIA endpoint directly instead.
+// or retrieval quality drops significantly.
 
 const embeddingHttpClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY,
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
-const EMBED_MODEL = "nvidia/nv-embedqa-e5-v5";
+const EMBED_MODEL = "nvidia/llama-nemotron-embed-1b-v2";
 
 /**
  * @param {string} text
@@ -107,6 +105,7 @@ export const embedText = async (text, inputType = "query") => {
     input_type: inputType,
     truncate: "NONE",
     encoding_format: "float",
+    dimensions: 1024,
   });
   return response.data[0].embedding;
 };
