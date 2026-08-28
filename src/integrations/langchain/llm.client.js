@@ -77,21 +77,17 @@ export const tripLLM = new ChatOpenAI({
 //   configuration: {
 //     baseURL: "https://integrate.api.nvidia.com/v1",
 //   },
-// });
-
-// ── Embedding model (NVIDIA llama-nemotron-embed-1b-v2, 1024-dim, matches the Upstash index) ──
+// ── Embedding model (OpenAI text-embedding-3-small or NVIDIA nemotron-3-embed-1b) ──
 // Used by the RAG retriever — NOT the chat models.
-//
-// llama-nemotron-embed-1b-v2 is an asymmetric retrieval model: NVIDIA's API requires
-// `input_type` ("query" for search terms, "passage" for indexed documents)
-// or retrieval quality drops significantly.
 
-const embeddingHttpClient = new OpenAI({
+const nvidiaEmbeddingClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY,
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
-const EMBED_MODEL = "nvidia/llama-nemotron-embed-1b-v2";
+const openaiEmbeddingClient = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 /**
  * @param {string} text
@@ -99,13 +95,31 @@ const EMBED_MODEL = "nvidia/llama-nemotron-embed-1b-v2";
  *   query, "passage" when embedding a document being indexed.
  */
 export const embedText = async (text, inputType = "query") => {
-  const response = await embeddingHttpClient.embeddings.create({
-    model: EMBED_MODEL,
+  // If OpenAI API key is available, use text-embedding-3-small with 1024 dimensions
+  if (openaiEmbeddingClient) {
+    try {
+      const response = await openaiEmbeddingClient.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text.slice(0, 8000),
+        dimensions: 1024,
+      });
+      return response.data[0].embedding;
+    } catch (err) {
+      logger.warn(`[Embeddings] OpenAI embedding failed (${err.message}), falling back to NVIDIA`);
+    }
+  }
+
+  // Fallback to NVIDIA's active Nemotron-3 embedding model
+  const response = await nvidiaEmbeddingClient.embeddings.create({
+    model: "nvidia/nemotron-3-embed-1b",
     input: text.slice(0, 8000),
     input_type: inputType,
-    truncate: "NONE",
     encoding_format: "float",
-    dimensions: 1024,
   });
-  return response.data[0].embedding;
+
+  let embedding = response.data[0].embedding;
+  if (embedding.length > 1024) {
+    embedding = embedding.slice(0, 1024);
+  }
+  return embedding;
 };
