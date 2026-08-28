@@ -232,7 +232,7 @@ import logger from "../../config/logger.js";
 // Cosine similarity on Upstash typically ranges higher than Pinecone's
 // dot-product scores for well-matched content — re-tune this after you
 // reseed and see real scores in your logs.
-const MIN_SCORE = 0.75;
+const MIN_SCORE = 0.35;
 
 // ─── Normalise Mongo _id (handles $oid wrappers from seed files) ─────────────
 export const normalizeDocId = (id) => {
@@ -267,6 +267,8 @@ export const retrieveContext = async (query, topK = 5) => {
     });
 
     if (!result?.length) return null;
+
+    logger.info(`[RAG] Upstash returned ${result.length} matches. Top score: ${result[0]?.score?.toFixed(3)} (threshold: ${MIN_SCORE})`);
 
     const chunks = result
       .filter((m) => m.score >= MIN_SCORE)
