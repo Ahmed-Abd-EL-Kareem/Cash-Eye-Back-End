@@ -252,7 +252,13 @@ export const retrieveContext = async (query, topK = 5) => {
   if (!index) return null;
 
   try {
-    const queryVector = await embedText(query, "query");
+    let queryVector;
+    try {
+      queryVector = await embedText(query, "query");
+    } catch (embedErr) {
+      logger.error(`[RAG] Embedding failed: ${embedErr.message}`);
+      return null;
+    }
 
     const result = await index.query({
       vector: queryVector,
