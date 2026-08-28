@@ -1233,8 +1233,10 @@ async function validatorNode(state) {
   const parsed = safeJsonParse(state.rawOutput);
   const normalized = normalizePlan(parsed, state.destination);
 
-  if (normalized && isValidPlan(normalized)) {
-    logger.info(`[TripPlanner] Plan validated: "${normalized.title.en}" / "${normalized.title.ar}" (${normalized.days.length} days)`);
+  if (normalized && (isValidPlan(normalized) || (Array.isArray(normalized.days) && normalized.days.length > 0))) {
+    const titleEn = normalized.title?.en || normalized.title || "Trip Plan";
+    const titleAr = normalized.title?.ar || normalized.title || "خطة الرحلة";
+    logger.info(`[TripPlanner] Plan validated: "${titleEn}" / "${titleAr}" (${normalized.days.length} days)`);
     return { plan: normalized, error: null };
   }
 
