@@ -9,9 +9,6 @@ import logger from "../../config/logger.js";
 if (!process.env.NVIDIA_API_KEY) {
   logger.warn("[LLM] NVIDIA_API_KEY not set — AI features will fail");
 }
-if (!process.env.OPENAI_API_KEY) {
-  logger.warn("[LLM] OPENAI_API_KEY not set — embeddings will fail");
-}
 
 // ── Chat model (NVIDIA endpoint, OpenAI-compatible) ──────────────────────────
 // Used by every agent sub-graph.
@@ -67,17 +64,7 @@ export const tripLLM = new ChatOpenAI({
   },
 });
 
-
-// // ── Embedding model (NVIDIA BAAI) ─────────────────────────────────────────────
-// // Used by the RAG retriever — NOT the chat models.
-// export const embeddings = new OpenAIEmbeddings({
-//   model: "baai/bge-m3",
-//   // model: "nvidia/nv-embedqa-e5-v5",
-//   apiKey: process.env.NVIDIA_API_KEY,
-//   configuration: {
-//     baseURL: "https://integrate.api.nvidia.com/v1",
-//   },
-// ── Embedding model (OpenAI text-embedding-3-small or NVIDIA nemotron-3-embed-1b) ──
+// ── Embedding model (NVIDIA nemotron-3-embed-1b) ────────────────────────────
 // Used by the RAG retriever — NOT the chat models.
 
 const nvidiaEmbeddingClient = new OpenAI({
@@ -85,31 +72,12 @@ const nvidiaEmbeddingClient = new OpenAI({
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
-const openaiEmbeddingClient = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
 /**
  * @param {string} text
  * @param {"query"|"passage"} inputType - "query" when embedding a search
  *   query, "passage" when embedding a document being indexed.
  */
 export const embedText = async (text, inputType = "query") => {
-  // If OpenAI API key is available, use text-embedding-3-small with 1024 dimensions
-  if (openaiEmbeddingClient) {
-    try {
-      const response = await openaiEmbeddingClient.embeddings.create({
-        model: "text-embedding-3-small",
-        input: text.slice(0, 8000),
-        dimensions: 1024,
-      });
-      return response.data[0].embedding;
-    } catch (err) {
-      logger.warn(`[Embeddings] OpenAI embedding failed (${err.message}), falling back to NVIDIA`);
-    }
-  }
-
-  // Fallback to NVIDIA's active Nemotron-3 embedding model
   const response = await nvidiaEmbeddingClient.embeddings.create({
     model: "nvidia/nemotron-3-embed-1b",
     input: text.slice(0, 8000),
