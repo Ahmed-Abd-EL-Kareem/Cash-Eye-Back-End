@@ -16,6 +16,13 @@ const sanitizeBaseUrl = (url) => {
   const DEFAULT_URL = "https://integrate.api.nvidia.com/v1";
   if (!url || typeof url !== "string") return DEFAULT_URL;
   let trimmed = url.trim().replace(/\/+$/, "");
+
+  // Strip endpoint suffixes if user pasted the full endpoint URL
+  trimmed = trimmed.replace(/\/chat\/completions\/?$/i, "");
+  trimmed = trimmed.replace(/\/embeddings\/?$/i, "");
+  trimmed = trimmed.replace(/\/models\/?$/i, "");
+  trimmed = trimmed.replace(/\/+$/, "");
+
   if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
     logger.warn(
       `[LLM] NVIDIA_BASE_URL "${trimmed}" is not a valid URL. Using "${DEFAULT_URL}" instead.`
