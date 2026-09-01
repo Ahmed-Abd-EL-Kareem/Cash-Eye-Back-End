@@ -15,14 +15,18 @@ if (!NVIDIA_API_KEY) {
 const sanitizeBaseUrl = (url) => {
   const DEFAULT_URL = "https://integrate.api.nvidia.com/v1";
   if (!url || typeof url !== "string") return DEFAULT_URL;
-  const trimmed = url.trim();
-  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
-    return trimmed;
+  let trimmed = url.trim().replace(/\/+$/, "");
+  if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
+    logger.warn(
+      `[LLM] NVIDIA_BASE_URL "${trimmed}" is not a valid URL. Using "${DEFAULT_URL}" instead.`
+    );
+    return DEFAULT_URL;
   }
-  logger.warn(
-    `[LLM] NVIDIA_BASE_URL "${trimmed}" is not a valid URL (it looks like a model name). Using "${DEFAULT_URL}" instead.`
-  );
-  return DEFAULT_URL;
+  // Ensure the base URL ends with /v1
+  if (!trimmed.endsWith("/v1")) {
+    trimmed = `${trimmed}/v1`;
+  }
+  return trimmed;
 };
 
 const NVIDIA_BASE_URL = sanitizeBaseUrl(process.env.NVIDIA_BASE_URL);
@@ -107,10 +111,12 @@ export const embedText = async (text, inputType = "query") => {
         configuredModel && !configuredModel.includes("/")
           ? `nvidia/${configuredModel}`
           : null,
-        "nvidia/nv-embedqa-e5-v5",
-        "baai/bge-m3",
-        "nvidia/llama-3.2-nv-embedqa-1b",
+        "nvidia/llama-3.2-nv-embedqa-1b-v1",
         "nvidia/nemotron-3-embed-1b",
+        "snowflake/arctic-embed-l",
+        "nvidia/embed-qa-4",
+        "nvidia/nv-embedqa-mistral-7b-v2",
+        "baai/bge-m3",
       ].filter(Boolean)
     )
   );
