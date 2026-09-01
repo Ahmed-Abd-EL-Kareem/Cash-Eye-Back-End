@@ -19,10 +19,32 @@ if (!GEMINI_API_KEY) {
 
 const safeApiKey = GEMINI_API_KEY || "missing-gemini-api-key";
 
-const DEFAULT_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash";
-const DEFAULT_STRUCTURED_MODEL = process.env.GEMINI_STRUCTURED_MODEL || "gemini-3.6-flash";
-const DEFAULT_BOOKING_MODEL = process.env.GEMINI_BOOKING_MODEL || "gemini-3.6-flash";
-const DEFAULT_TRIP_MODEL = process.env.GEMINI_TRIP_MODEL || "gemini-3.6-flash";
+const sanitizeGeminiModel = (modelName) => {
+  const DEFAULT_MODEL = "gemini-3.6-flash";
+  if (!modelName || typeof modelName !== "string") return DEFAULT_MODEL;
+  const trimmed = modelName.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Auto-upgrade deprecated/unavailable models reported by Google
+  if (
+    lower === "gemini-2.5-flash" ||
+    lower === "gemini-2.0-flash" ||
+    lower === "gemini-1.5-flash" ||
+    lower === "gemini-1.5-pro"
+  ) {
+    logger.warn(
+      `[LLM] Model "${trimmed}" is deprecated/unavailable on Google Generative AI API. Auto-upgrading to "${DEFAULT_MODEL}".`
+    );
+    return DEFAULT_MODEL;
+  }
+
+  return trimmed;
+};
+
+const DEFAULT_CHAT_MODEL = sanitizeGeminiModel(process.env.GEMINI_CHAT_MODEL);
+const DEFAULT_STRUCTURED_MODEL = sanitizeGeminiModel(process.env.GEMINI_STRUCTURED_MODEL);
+const DEFAULT_BOOKING_MODEL = sanitizeGeminiModel(process.env.GEMINI_BOOKING_MODEL);
+const DEFAULT_TRIP_MODEL = sanitizeGeminiModel(process.env.GEMINI_TRIP_MODEL);
 
 // ── Chat model (Google Gemini) ───────────────────────────────────────────────
 export const chatLLM = new ChatGoogleGenerativeAI({
@@ -70,7 +92,9 @@ const candidateTripModels = Array.from(
       "gemini-2.0-flash-001",
       "gemini-1.5-pro-latest",
       "gemini-1.5-pro-002",
-    ].filter(Boolean)
+    ]
+      .map(sanitizeGeminiModel)
+      .filter(Boolean)
   )
 );
 
