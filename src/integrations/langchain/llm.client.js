@@ -30,6 +30,10 @@ const sanitizeBaseUrl = (url) => {
 };
 
 const NVIDIA_BASE_URL = sanitizeBaseUrl(process.env.NVIDIA_BASE_URL);
+const NVIDIA_EMBEDDING_BASE_URL = sanitizeBaseUrl(
+  process.env.NVIDIA_EMBEDDING_BASE_URL || process.env.NVIDIA_BASE_URL
+);
+const NVIDIA_EMBEDDING_API_KEY = process.env.NVIDIA_EMBEDDING_API_KEY || NVIDIA_API_KEY;
 
 // Active, verified production models on NVIDIA NIM (integrate.api.nvidia.com)
 const DEFAULT_CHAT_MODEL = process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
@@ -86,10 +90,10 @@ export const tripLLM = new ChatOpenAI({
 });
 
 // ── NVIDIA Embedding Client ───────────────────────────────────────────────────
-const nvidiaEmbeddingClient = NVIDIA_API_KEY
+const nvidiaEmbeddingClient = NVIDIA_EMBEDDING_API_KEY
   ? new OpenAI({
-      apiKey: NVIDIA_API_KEY,
-      baseURL: NVIDIA_BASE_URL,
+      apiKey: NVIDIA_EMBEDDING_API_KEY,
+      baseURL: NVIDIA_EMBEDDING_BASE_URL,
     })
   : null;
 
