@@ -2,75 +2,81 @@
 // Centralised LangChain LLM / embedding instances.
 // All agents import from here — swap models in one place.
 
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+import { ChatOpenAI } from "@langchain/openai";
 import OpenAI from "openai";
 import logger from "../../config/logger.js";
 
-if (!process.env.NVIDIA_API_KEY) {
-  logger.warn("[LLM] NVIDIA_API_KEY not set — AI features will fail");
+if (!process.env.NVIDIA_API_KEY && !process.env.OPENAI_API_KEY) {
+  logger.warn("[LLM] Neither NVIDIA_API_KEY nor OPENAI_API_KEY set — AI features will fail");
 }
 
-// ── Chat model (NVIDIA endpoint, OpenAI-compatible) ──────────────────────────
-// Used by every agent sub-graph.
+const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
+
+// Active, verified production models on NVIDIA NIM (integrate.api.nvidia.com)
+const DEFAULT_CHAT_MODEL = process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+const DEFAULT_STRUCTURED_MODEL = process.env.NVIDIA_STRUCTURED_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+const DEFAULT_BOOKING_MODEL = process.env.NVIDIA_BOOKING_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+const DEFAULT_TRIP_MODEL = process.env.NVIDIA_TRIP_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+
+// ── Chat model (NVIDIA NIM endpoint, OpenAI-compatible) ──────────────────────────
 export const chatLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-super-120b-a12b",
+  model: DEFAULT_CHAT_MODEL,
   temperature: 0.5,
-  maxTokens: 800,
-  apiKey: process.env.NVIDIA_API_KEY,
+  maxTokens: 1000,
+  apiKey: process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY,
   configuration: {
-    baseURL: "https://integrate.api.nvidia.com/v1",
+    baseURL: process.env.NVIDIA_API_KEY ? NVIDIA_BASE_URL : undefined,
   },
 });
 
-// Stricter / faster variant for structured-output agents
-// Used by fieldExtractorNode (aiBookingConversation.js) to pull booking facts
-// (destination/dates/guests/etc) out of the user's message every turn.
-// gpt-oss-20b is a reasoning-style model — it spends completion tokens on
-// internal reasoning BEFORE writing the JSON. 400 was enough for short
-// messages but silently truncated (and lost) extraction on longer, more
-// detail-packed ones — the JSON never finished, safeJsonParse fell back to
-// {}, and nothing got merged into session.context. Raised for headroom.
+// Stricter variant for structured-output agents (field extraction / JSON parsing)
 export const structuredLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-super-120b-a12b",
-  temperature: 0.3,
-  maxTokens: 1200,
-  apiKey: process.env.NVIDIA_API_KEY,
-  configuration: {
-    baseURL: "https://integrate.api.nvidia.com/v1",
-  },
-});
-
-// Booking agent uses fast Nemotron 120B model
-export const bookingLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-super-120b-a12b",
-  temperature: 0.6,
+  model: DEFAULT_STRUCTURED_MODEL,
+  temperature: 0.2,
   maxTokens: 1500,
-  apiKey: process.env.NVIDIA_API_KEY,
-  maxRetries: 4,        // langchain will retry on 429/5xx with backoff
-  timeout: 30_000,
+  apiKey: process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY,
   configuration: {
-    baseURL: "https://integrate.api.nvidia.com/v1",
+    baseURL: process.env.NVIDIA_API_KEY ? NVIDIA_BASE_URL : undefined,
   },
 });
 
-// Trip planner uses fast Nemotron 120B model for high throughput
+// Booking conversation agent
+export const bookingLLM = new ChatOpenAI({
+  model: DEFAULT_BOOKING_MODEL,
+  temperature: 0.5,
+  maxTokens: 2000,
+  apiKey: process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY,
+  maxRetries: 4,
+  timeout: 35_000,
+  configuration: {
+    baseURL: process.env.NVIDIA_API_KEY ? NVIDIA_BASE_URL : undefined,
+  },
+});
+
+// Trip planner agent with token headroom for full itineraries
 export const tripLLM = new ChatOpenAI({
-  model: "nvidia/nemotron-3-super-120b-a12b",
+  model: DEFAULT_TRIP_MODEL,
   temperature: 0.6,
-  maxTokens: 3000,
-  apiKey: process.env.NVIDIA_API_KEY,
+  maxTokens: 3500,
+  apiKey: process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY,
+  maxRetries: 4,
+  timeout: 45_000,
   configuration: {
-    baseURL: "https://integrate.api.nvidia.com/v1",
+    baseURL: process.env.NVIDIA_API_KEY ? NVIDIA_BASE_URL : undefined,
   },
 });
 
-// ── Embedding model (NVIDIA nemotron-3-embed-1b) ────────────────────────────
-// Used by the RAG retriever — NOT the chat models.
+// ── Embedding model ─────────────────────────────────────────────────────────────
+const nvidiaEmbeddingClient = process.env.NVIDIA_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.NVIDIA_API_KEY,
+      baseURL: NVIDIA_BASE_URL,
+    })
+  : null;
 
-const nvidiaEmbeddingClient = new OpenAI({
-  apiKey: process.env.NVIDIA_API_KEY,
-  baseURL: "https://integrate.api.nvidia.com/v1",
-});
+const openaiEmbeddingClient = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 /**
  * @param {string} text
@@ -78,16 +84,34 @@ const nvidiaEmbeddingClient = new OpenAI({
  *   query, "passage" when embedding a document being indexed.
  */
 export const embedText = async (text, inputType = "query") => {
-  const response = await nvidiaEmbeddingClient.embeddings.create({
-    model: "nvidia/nemotron-3-embed-1b",
-    input: text.slice(0, 8000),
-    input_type: inputType,
-    encoding_format: "float",
-  });
-
-  let embedding = response.data[0].embedding;
-  if (embedding.length > 1024) {
-    embedding = embedding.slice(0, 1024);
+  // If OpenAI API key is available, use text-embedding-3-small (1024 dimensions)
+  if (openaiEmbeddingClient) {
+    try {
+      const response = await openaiEmbeddingClient.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text.slice(0, 8000),
+        dimensions: 1024,
+      });
+      return response.data[0].embedding;
+    } catch (err) {
+      logger.warn(`[Embeddings] OpenAI embedding failed (${err.message}), trying NVIDIA`);
+    }
   }
-  return embedding;
+
+  if (nvidiaEmbeddingClient) {
+    const response = await nvidiaEmbeddingClient.embeddings.create({
+      model: "nvidia/nemotron-3-embed-1b",
+      input: text.slice(0, 8000),
+      input_type: inputType,
+      encoding_format: "float",
+    });
+
+    let embedding = response.data[0].embedding;
+    if (embedding.length > 1024) {
+      embedding = embedding.slice(0, 1024);
+    }
+    return embedding;
+  }
+
+  throw new Error("No embedding provider configured (NVIDIA_API_KEY or OPENAI_API_KEY required)");
 };

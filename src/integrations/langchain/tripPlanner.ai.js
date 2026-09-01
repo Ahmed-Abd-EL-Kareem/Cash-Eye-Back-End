@@ -1197,10 +1197,16 @@ async function plannerNode(state) {
     `- Travelers: ${state.travelers}\n` +
     `- Interests: ${interestsList}`;
 
-  const response = await tripLLM.invoke([
-    new SystemMessage(systemContent),
-    new HumanMessage(userPrompt),
-  ]);
+  let response;
+  try {
+    response = await tripLLM.invoke([
+      new SystemMessage(systemContent),
+      new HumanMessage(userPrompt),
+    ]);
+  } catch (err) {
+    logger.error(`[TripPlanner] LLM invocation failed: ${err.message}`);
+    throw err;
+  }
 
   const tokensUsed = (response.usage_metadata?.total_tokens || 0) + state.tokensUsed;
   logger.info(`[TripPlanner] LLM done — ${tokensUsed} total tokens`);

@@ -83,7 +83,7 @@ export const generateAndSaveTrip = async (userId, params) => {
       tripId: null,
       prompt: null,
       response: null,
-      model: "openai/gpt-oss-120b",
+      model: process.env.NVIDIA_TRIP_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct",
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,
@@ -93,7 +93,16 @@ export const generateAndSaveTrip = async (userId, params) => {
       errorMessage: error.message || "Failed to generate AI trip plan",
     });
 
-    throw error;
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    const statusCode = error.status === 429 || error.statusCode === 429 ? 429 : 503;
+    const message = error.message?.includes("quota")
+      ? error.message
+      : "The AI travel planner is temporarily experiencing high load. Please try again shortly.";
+
+    throw new ApiError(message, statusCode);
   }
 };
 

@@ -9,6 +9,23 @@ const objectId = (value, helpers) => {
   return value;
 };
 
+const validateCheckInDate = (value, helpers) => {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    return helpers.error("date.base");
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const checkInDate = new Date(d);
+  checkInDate.setHours(0, 0, 0, 0);
+
+  if (checkInDate.getTime() < today.getTime()) {
+    return helpers.error("date.min");
+  }
+  return value;
+};
+
 const roomSelectionSchema = Joi.object({
   room: Joi.string().custom(objectId).required().messages({
     "any.required": "room ID is required",
@@ -38,17 +55,17 @@ const createHoldSchema = Joi.object({
     "any.required": "hotel ID is required",
     "any.invalid": "hotel must be a valid ObjectId",
   }),
-  checkIn: Joi.date().iso().greater("now").required().messages({
-    "date.base": "checkIn must be a valid date",
-    "date.format": "checkIn must be in ISO format",
-    "date.greater": "checkIn must be a future date",
-    "any.required": "checkIn is required",
+  checkIn: Joi.date().iso().custom(validateCheckInDate).required().messages({
+    "date.base": "Check-in must be a valid date",
+    "date.format": "Check-in must be in ISO format (YYYY-MM-DD)",
+    "date.min": "Check-in date cannot be in the past. Please select today or a future date.",
+    "any.required": "Check-in date is required",
   }),
   checkOut: Joi.date().iso().greater(Joi.ref("checkIn")).required().messages({
-    "date.base": "checkOut must be a valid date",
-    "date.format": "checkOut must be in ISO format",
-    "date.greater": "checkOut must be after checkIn",
-    "any.required": "checkOut is required",
+    "date.base": "Check-out must be a valid date",
+    "date.format": "Check-out must be in ISO format (YYYY-MM-DD)",
+    "date.greater": "Check-out date must be after check-in date",
+    "any.required": "Check-out date is required",
   }),
   rooms: Joi.array().items(roomSelectionSchema).min(1).required().messages({
     "array.base": "rooms must be an array",
@@ -64,17 +81,17 @@ const createHoldSchema = Joi.object({
 });
 
 const availabilityQuerySchema = Joi.object({
-  checkIn: Joi.date().iso().greater("now").required().messages({
-    "date.base": "checkIn must be a valid date",
-    "date.format": "checkIn must be in ISO format",
-    "date.greater": "checkIn must be a future date",
-    "any.required": "checkIn is required",
+  checkIn: Joi.date().iso().custom(validateCheckInDate).required().messages({
+    "date.base": "Check-in must be a valid date",
+    "date.format": "Check-in must be in ISO format (YYYY-MM-DD)",
+    "date.min": "Check-in date cannot be in the past. Please select today or a future date.",
+    "any.required": "Check-in date is required",
   }),
   checkOut: Joi.date().iso().greater(Joi.ref("checkIn")).required().messages({
-    "date.base": "checkOut must be a valid date",
-    "date.format": "checkOut must be in ISO format",
-    "date.greater": "checkOut must be after checkIn",
-    "any.required": "checkOut is required",
+    "date.base": "Check-out must be a valid date",
+    "date.format": "Check-out must be in ISO format (YYYY-MM-DD)",
+    "date.greater": "Check-out date must be after check-in date",
+    "any.required": "Check-out date is required",
   }),
   room: Joi.string().custom(objectId).optional().messages({
     "any.invalid": "room must be a valid ObjectId",
