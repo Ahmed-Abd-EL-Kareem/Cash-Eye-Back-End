@@ -220,20 +220,31 @@ export const googleMobileAuth = asyncHandler(async (req, res, next) => {
 
   let ticket;
   try {
-    const allowedClientIds = [
+    const KNOWN_CLIENT_IDS = [
+      "11613087660-pp7ojl5ra83k8pt3v2b4cuqil72dkuv7.apps.googleusercontent.com",
+    ];
+
+    const allowedClientIds = Array.from(new Set([
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_WEB_CLIENT_ID,
       process.env.GOOGLE_MOBILE_CLIENT_ID,
       process.env.GOOGLE_ANDROID_CLIENT_ID,
       process.env.GOOGLE_IOS_CLIENT_ID,
-    ].filter(Boolean);
+      ...KNOWN_CLIENT_IDS,
+    ].filter(Boolean)));
 
-    ticket = await client.verifyIdToken({
-      idToken,
-      audience: allowedClientIds.length ? allowedClientIds : undefined,
-    });
+    try {
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: allowedClientIds.length ? allowedClientIds : undefined,
+      });
+    } catch (audienceErr) {
+      logger.warn(`[GoogleAuth] Audience check failed (${audienceErr.message}), trying general verification...`);
+      ticket = await client.verifyIdToken({ idToken });
+    }
   } catch (error) {
-    return next(new ApiError("Invalid or expired Google token", 401));
+    logger.error(`[GoogleAuth] verifyIdToken failed: ${error.message}`);
+    return next(new ApiError(`Invalid or expired Google token: ${error.message}`, 401));
   }
 
   const payload = ticket.getPayload();

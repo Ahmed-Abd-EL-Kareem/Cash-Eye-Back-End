@@ -84,7 +84,46 @@ const openaiEmbeddingClient = process.env.OPENAI_API_KEY
  *   query, "passage" when embedding a document being indexed.
  */
 export const embedText = async (text, inputType = "query") => {
-  // If OpenAI API key is available, use text-embedding-3-small (1024 dimensions)
+  // Always use NVIDIA embedding first when NVIDIA_API_KEY is present
+  if (nvidiaEmbeddingClient) {
+    try {
+      const model = process.env.NVIDIA_EMBEDDING_MODEL || "nvidia/llama-3.2-nv-embedqa-1b";
+      const response = await nvidiaEmbeddingClient.embeddings.create({
+        model,
+        input: text.slice(0, 8000),
+        input_type: inputType,
+        encoding_format: "float",
+      });
+
+      let embedding = response.data[0].embedding;
+      if (embedding.length > 1024) {
+        embedding = embedding.slice(0, 1024);
+      }
+      return embedding;
+    } catch (err) {
+      logger.warn(`[Embeddings] NVIDIA embedding failed with primary model (${err.message}), trying fallback`);
+      try {
+        const fallbackResponse = await nvidiaEmbeddingClient.embeddings.create({
+          model: "baai/bge-m3",
+          input: text.slice(0, 8000),
+          input_type: inputType,
+          encoding_format: "float",
+        });
+        let embedding = fallbackResponse.data[0].embedding;
+        if (embedding.length > 1024) {
+          embedding = embedding.slice(0, 1024);
+        }
+        return embedding;
+      } catch (fallbackErr) {
+        logger.error(`[Embeddings] NVIDIA fallback embedding failed: ${fallbackErr.message}`);
+        if (!openaiEmbeddingClient) {
+          throw fallbackErr;
+        }
+      }
+    }
+  }
+
+  // Fallback to OpenAI only if NVIDIA is not configured
   if (openaiEmbeddingClient) {
     try {
       const response = await openaiEmbeddingClient.embeddings.create({
@@ -94,24 +133,10 @@ export const embedText = async (text, inputType = "query") => {
       });
       return response.data[0].embedding;
     } catch (err) {
-      logger.warn(`[Embeddings] OpenAI embedding failed (${err.message}), trying NVIDIA`);
+      logger.warn(`[Embeddings] OpenAI embedding failed (${err.message})`);
+      throw err;
     }
   }
 
-  if (nvidiaEmbeddingClient) {
-    const response = await nvidiaEmbeddingClient.embeddings.create({
-      model: "nvidia/nemotron-3-embed-1b",
-      input: text.slice(0, 8000),
-      input_type: inputType,
-      encoding_format: "float",
-    });
-
-    let embedding = response.data[0].embedding;
-    if (embedding.length > 1024) {
-      embedding = embedding.slice(0, 1024);
-    }
-    return embedding;
-  }
-
-  throw new Error("No embedding provider configured (NVIDIA_API_KEY or OPENAI_API_KEY required)");
+  throw new Error("No embedding provider configured (NVIDIA_API_KEY required)");
 };
