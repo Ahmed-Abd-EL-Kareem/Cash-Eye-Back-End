@@ -101,11 +101,11 @@ const candidateTripModels = Array.from(
   new Set(
     [
       DEFAULT_TRIP_MODEL,
-      "nvidia/nemotron-3.5-lightning-30b-a3b",
-      "nvidia/llama-3.1-nemotron-70b-instruct",
       "deepseek-ai/deepseek-v4-flash-0731",
+      "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "google/gemma-3-12b-it",
+      "nvidia/llama-3.1-nemotron-70b-instruct",
       "mistralai/mistral-large-2-instruct",
-      "mistralai/mistral-7b-instruct-v0.3",
     ].filter(Boolean)
   )
 );
@@ -123,10 +123,10 @@ export const invokeTripPlanner = async (messages) => {
       const llm = new ChatOpenAI({
         model,
         temperature: 0.6,
-        maxTokens: 3500,
+        maxTokens: 2500,
         apiKey: NVIDIA_API_KEY,
         maxRetries: 0,
-        timeout: 35_000,
+        timeout: 50_000,
         configuration: {
           baseURL: NVIDIA_BASE_URL,
         },
