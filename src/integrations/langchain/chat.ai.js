@@ -863,27 +863,50 @@ const State = Annotation.Root({
   hotelIds: Annotation({ reducer: (_, b) => b, default: () => [] }),
 });
 
+// ─── Lazy imports avoid circular deps at module load time ──────────────────────
+const getHotelService = async () =>
+  (await import("../../modules/hotels/hotel.service.js"));
+
+// ─── Fast Heuristic Intent Classifier (0ms) ───────────────────────────────────
+const detectIntentFast = (text) => {
+  if (!text || typeof text !== "string") return "chat";
+  const lower = text.toLowerCase();
+
+  // Recommendations trigger
+  if (
+    /recommend|ترشيح|رشحلي|رشح لي|أفضل فندق|افضل فندق|best hotels|top hotels/i.test(
+      lower
+    )
+  ) {
+    return "recommendations";
+  }
+
+  // Hotel search trigger
+  if (
+    /hotel|hotels|resort|resorts|فندق|فنادق|منتجع|منتجعات|rooms|غرفة|غرف|accommodation|إقامة|اقامة|أوتيل|اوتيل/i.test(
+      lower
+    )
+  ) {
+    return "hotel_search";
+  }
+
+  return "chat";
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE: SUPERVISOR
 // Routes between chat / hotel_search / recommendations
 // ─────────────────────────────────────────────────────────────────────────────
 async function supervisorNode(state) {
-  // If caller already set nextAgent (direct API call), skip LLM routing
+  // If caller already set nextAgent (direct API call), skip routing
   if (state.nextAgent && state.nextAgent !== "chat") {
     logger.info(`[Supervisor] Direct route → ${state.nextAgent}`);
     return {};
   }
 
-  logger.info(`[Supervisor] Classifying: "${state.userMessage.slice(0, 80)}"`);
-
-  const response = await structuredLLM.invoke([
-    new SystemMessage(CHAT_SUPERVISOR_SYSTEM),
-    new HumanMessage(state.userMessage),
-  ]);
-
-  const parsed = safeJsonParse(response.content, { agent: "chat" });
-  const nextAgent = parsed.agent || "chat";
-  logger.info(`[Supervisor] → ${nextAgent}`);
+  // Fast 0ms heuristic routing without extra LLM round-trip
+  const nextAgent = detectIntentFast(state.userMessage);
+  logger.info(`[Supervisor] Fast route → ${nextAgent}`);
   return { nextAgent };
 }
 
@@ -894,12 +917,23 @@ async function supervisorNode(state) {
 async function chatNode(state) {
   logger.info("[Chat Agent] Responding to message");
 
-  const ragContext = await retrieveContext(state.userMessage, 3);
+  // Fetch RAG context with a fast 1.5s timeout so vector DB never blocks the chat
+  let ragContext = null;
+  try {
+    const ragPromise = retrieveContext(state.userMessage, 3);
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve(null), 1500)
+    );
+    ragContext = await Promise.race([ragPromise, timeoutPromise]);
+  } catch (ragErr) {
+    logger.warn(`[Chat Agent] RAG context error: ${ragErr.message}`);
+  }
+
   const systemContent = CHAT_SYSTEM
     .replace("{ragContext}", buildRagBlock(ragContext))
     .replace("{languageInstruction}", buildLanguageInstruction(state.userMessage));
 
-  const history = (state.messages || []).slice(-10).map((m) =>
+  const history = (state.messages || []).slice(-6).map((m) =>
     m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
   );
 
@@ -917,79 +951,72 @@ async function chatNode(state) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE: HOTEL SEARCH AGENT
-// Tool-calling loop: RAG → search_hotels → score_hotels → reply
+// Fast 1-Pass Hotel Search: DB search + Single LLM formatting (~1.5s)
 // ─────────────────────────────────────────────────────────────────────────────
-const hotelSearchTools = [ragTool, searchHotelsTool, scoreHotelsTool];
-const hotelSearchToolNode = new ToolNode(hotelSearchTools);
-const hotelSearchLLM = structuredLLM.bindTools(hotelSearchTools);
-
 async function hotelSearchNode(state) {
   logger.info("[Hotel Search Agent] Processing search");
 
-  const ragContext = await retrieveContext(`Egypt hotel ${state.userMessage}`, 3);
   const languageInstruction = buildLanguageInstruction(state.userMessage);
-  const systemContent = HOTEL_SEARCH_SYSTEM
-    .replace("{ragContext}", buildRagBlock(ragContext))
-    .replace("{languageInstruction}", languageInstruction);
 
-  let messages = [
-    new SystemMessage(systemContent),
-    new HumanMessage(state.userMessage),
-  ];
+  // Directly search hotels from MongoDB in parallel
+  let hotelResults = [];
+  try {
+    const hotelService = await getHotelService();
+    const lower = state.userMessage.toLowerCase();
+    const cityMatch = lower.match(
+      /cairo|giza|luxor|aswan|alexandria|hurghada|sharm|dahab|marsa alam|el gouna|siwa|القاهرة|الجيزة|الأقصر|الاقصر|أسوان|اسوان|الإسكندرية|الاسكندرية|الغردقة|شرم|دهب|مرسى علم|الجونة|سيوة/i
+    );
+    const city = cityMatch ? cityMatch[0] : undefined;
 
-  let tokensUsed = 0;
-  // Tracks the most recent hotel id list seen from search_hotels / score_hotels.
-  // score_hotels runs after search_hotels in the normal flow, so if both fire
-  // this naturally ends up holding the ranked (scored) order — which is what
-  // we want for the frontend.
-  let hotelIds = [];
+    const cleanSearch = state.userMessage
+      .replace(
+        /hotel|hotels|فندق|فنادق|ابحث عن|find|search|اريد|عايز|أفضل|افضل/gi,
+        ""
+      )
+      .trim();
 
-  for (let i = 0; i < 5; i++) {
-    const response = await hotelSearchLLM.invoke(messages);
-    messages.push(response);
-    tokensUsed += response.usage_metadata?.total_tokens || 0;
-
-    if (!response.tool_calls?.length) {
-      const raw = (response.content || "").trim();
-      // Guard: if the model just echoed raw JSON/array, force it to rephrase
-      if (raw.startsWith("{") || raw.startsWith("[")) {
-        messages.push(
-          new HumanMessage(
-            `${languageInstruction} Please summarise those hotels in a friendly, ` +
-            "human-readable message — name, city, stars, price/night, top amenities. " +
-            "Do not output raw JSON."
-          )
-        );
-        continue;
-      }
-      logger.info(`[Hotel Search Agent] Done — ${tokensUsed} tokens, ${hotelIds.length} hotel ids`);
-      return { agentUsed: "hotel_search", reply: raw, tokensUsed, hotelIds };
-    }
-
-    const toolResult = await hotelSearchToolNode.invoke({ messages });
-    messages.push(...toolResult.messages);
-
-    // Capture hotel ids from whichever relevant tool just ran, in order.
-    for (const m of toolResult.messages) {
-      const ids = extractHotelIdsFromToolMessage(m);
-      if (ids) hotelIds = ids;
-    }
+    const { hotels } = await hotelService.getAllHotels({
+      city,
+      search: cleanSearch || undefined,
+      limit: 6,
+      sort: "-stars",
+    });
+    hotelResults = hotels || [];
+  } catch (dbErr) {
+    logger.warn(`[Hotel Search Agent] Direct DB search note: ${dbErr.message}`);
   }
 
-  // Loop exhausted — force one more call asking explicitly for a summary,
-  // never return a ToolMessage's raw content as the reply.
-  messages.push(
-    new HumanMessage(
-      `${languageInstruction} Please give a friendly summary of the hotels found so far, ` +
-      "in plain language."
-    )
+  const hotelSummaryText =
+    hotelResults.length > 0
+      ? hotelResults
+          .map(
+            (h, i) =>
+              `${i + 1}. ${h.name?.en || h.name} (${h.stars}★) in ${h.city} - ${h.currency || "EGP"} ${h.averagePricePerNight}/night. Amenities: ${(h.amenities || []).slice(0, 4).join(", ")}.`
+          )
+          .join("\n")
+      : "No exact hotel matches found in database.";
+
+  const hotelIds = hotelResults.map((h) => h._id.toString());
+
+  const prompt = `User search request: "${state.userMessage}"\n\nAvailable Hotels in database:\n${hotelSummaryText}\n\n${languageInstruction} Provide a warm, concise, and helpful natural language summary of these options highlighting their best features, prices, and locations. Do NOT output raw JSON.`;
+
+  const response = await chatLLM.invoke([
+    new SystemMessage(
+      HOTEL_SEARCH_SYSTEM
+        .replace("{ragContext}", "")
+        .replace("{languageInstruction}", languageInstruction)
+    ),
+    new HumanMessage(prompt),
+  ]);
+
+  const tokensUsed = response.usage_metadata?.total_tokens || 0;
+  logger.info(
+    `[Hotel Search Agent] Done — ${tokensUsed} tokens, ${hotelIds.length} hotel ids`
   );
-  const recovery = await hotelSearchLLM.invoke(messages);
-  tokensUsed += recovery.usage_metadata?.total_tokens || 0;
 
   return {
     agentUsed: "hotel_search",
-    reply: recovery.content || "I found some hotels but had trouble summarising them — please try again.",
+    reply: response.content,
     tokensUsed,
     hotelIds,
   };
@@ -997,113 +1024,77 @@ async function hotelSearchNode(state) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE: RECOMMENDATIONS AGENT
-// Tool-calling loop: RAG → (trip ctx) → search_hotels → score_hotels → reply
+// Fast 1-Pass Recommendations: DB scoring + Single LLM summary (~1.5s)
 // ─────────────────────────────────────────────────────────────────────────────
-const recommendationTools = [ragTool, getTripContextTool, searchHotelsTool, scoreHotelsTool];
-const recommendationToolNode = new ToolNode(recommendationTools);
-const recommendationLLM = chatLLM.bindTools(recommendationTools);
-
 async function recommendationsNode(state) {
   logger.info("[Recommendations Agent] Processing request");
 
   const {
-    tripId,
     destination,
     budget = "mid-range",
     interests = [],
     travelers = 1,
-    limit = 10,
-  } = state.context;
+    limit = 6,
+  } = state.context || {};
 
-  const ragQuery = `${destination || "Egypt"} hotels ${interests.join(" ")} ${budget} recommendations`;
-  const ragContext = await retrieveContext(ragQuery, 5);
-
-  // Recommendations has no single free-text "user message" the way chat/search
-  // do (state.userMessage is a fixed placeholder — see getHotelRecommendations
-  // below) — language is detected from the destination text instead, since
-  // that's the only user-supplied free text this agent receives. Callers that
-  // want Arabic output should pass an Arabic destination/interest string, or
-  // this defaults to English.
-  const languageDetectionSource = [destination, ...interests].filter(Boolean).join(" ");
+  const languageDetectionSource = [destination, ...interests, state.userMessage]
+    .filter(Boolean)
+    .join(" ");
   const languageInstruction = buildLanguageInstruction(languageDetectionSource);
 
-  const systemContent = RECOMMENDATIONS_SYSTEM
-    .replace("{ragContext}", buildRagBlock(ragContext))
-    .replace("{languageInstruction}", languageInstruction);
-
-  const userPrompt = [
-    "Find hotel recommendations for:",
-    tripId ? `- Trip ID: ${tripId}\n- User ID: ${state.userId}` : null,
-    `- Destination: ${destination || "Egypt"}`,
-    `- Budget: ${budget}`,
-    `- Interests: ${interests.join(", ") || "general travel"}`,
-    `- Travelers: ${travelers}`,
-    `- Limit: ${limit} recommendations`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  let messages = [
-    new SystemMessage(systemContent),
-    new HumanMessage(userPrompt),
-  ];
-
-  let tokensUsed = 0;
-  // Same capture pattern as hotelSearchNode — see comment there.
-  let hotelIds = [];
-
-  for (let i = 0; i < 6; i++) {
-    const response = await recommendationLLM.invoke(messages);
-    messages.push(response);
-    tokensUsed += response.usage_metadata?.total_tokens || 0;
-
-    if (!response.tool_calls?.length) {
-      const raw = (response.content || "").trim();
-      // Guard: if the model just echoed raw JSON/array from score_hotels, force a rephrase
-      if (raw.startsWith("{") || raw.startsWith("[")) {
-        messages.push(
-          new HumanMessage(
-            `${languageInstruction} Please explain those recommendations warmly in plain ` +
-            "language — why each hotel fits, match score, price, key amenities. " +
-            "Do not output raw JSON."
-          )
-        );
-        continue;
-      }
-      logger.info(`[Recommendations Agent] Done — ${tokensUsed} tokens, ${hotelIds.length} hotel ids`);
-      return { agentUsed: "recommendations", reply: raw, tokensUsed, hotelIds };
-    }
-
-    const toolResult = await recommendationToolNode.invoke({ messages });
-    messages.push(...toolResult.messages);
-
-    // Capture hotel ids from whichever relevant tool just ran, in order.
-    // get_trip_context / retrieve_rag_context outputs are simply ignored here
-    // since extractHotelIdsFromToolMessage returns null for non-hotel shapes.
-    for (const m of toolResult.messages) {
-      const ids = extractHotelIdsFromToolMessage(m);
-      if (ids) hotelIds = ids;
-    }
-
-    // Respect the caller's requested limit so the card list doesn't show
-    // more hotels than the AI was actually asked to recommend.
-    if (hotelIds.length > limit) hotelIds = hotelIds.slice(0, limit);
+  let hotelResults = [];
+  try {
+    const hotelService = await getHotelService();
+    const { hotels } = await hotelService.getAllHotels({
+      city: destination || undefined,
+      limit: limit || 6,
+      sort: "-stars",
+    });
+    hotelResults = hotels || [];
+  } catch (err) {
+    logger.warn(`[Recommendations Agent] DB search: ${err.message}`);
   }
 
-  // Loop exhausted — force one more call asking explicitly for a summary,
-  // never return a ToolMessage's raw content as the reply.
-  messages.push(
-    new HumanMessage(
-      `${languageInstruction} Please give a friendly summary of your top hotel recommendations, ` +
-      "in plain language."
-    )
+  const hotelSummaryText =
+    hotelResults.length > 0
+      ? hotelResults
+          .map(
+            (h, i) =>
+              `${i + 1}. ${h.name?.en || h.name} (${h.stars}★) in ${h.city} - ${h.currency || "EGP"} ${h.averagePricePerNight}/night. Amenities: ${(h.amenities || []).slice(0, 4).join(", ")}.`
+          )
+          .join("\n")
+      : "No specific hotels found.";
+
+  const hotelIds = hotelResults.map((h) => h._id.toString());
+
+  const prompt = `User preferences:
+- Destination: ${destination || "Egypt"}
+- Budget: ${budget}
+- Interests: ${interests.join(", ") || "general travel"}
+- Travelers: ${travelers}
+
+Matching Hotels:
+${hotelSummaryText}
+
+${languageInstruction} Recommend these hotels warmly in plain language, explaining why each fits the traveler's needs and budget. Do NOT output raw JSON.`;
+
+  const response = await chatLLM.invoke([
+    new SystemMessage(
+      RECOMMENDATIONS_SYSTEM
+        .replace("{ragContext}", "")
+        .replace("{languageInstruction}", languageInstruction)
+    ),
+    new HumanMessage(prompt),
+  ]);
+
+  const tokensUsed = response.usage_metadata?.total_tokens || 0;
+  logger.info(
+    `[Recommendations Agent] Done — ${tokensUsed} tokens, ${hotelIds.length} hotel ids`
   );
-  const recovery = await recommendationLLM.invoke(messages);
-  tokensUsed += recovery.usage_metadata?.total_tokens || 0;
 
   return {
     agentUsed: "recommendations",
-    reply: recovery.content || "I found some recommendations but had trouble summarising them — please try again.",
+    reply: response.content,
     tokensUsed,
     hotelIds,
   };
