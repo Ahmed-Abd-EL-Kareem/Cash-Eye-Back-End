@@ -12,7 +12,20 @@ if (!NVIDIA_API_KEY) {
   logger.warn("[LLM] NVIDIA_API_KEY is not set — AI features will fail");
 }
 
-const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
+const sanitizeBaseUrl = (url) => {
+  const DEFAULT_URL = "https://integrate.api.nvidia.com/v1";
+  if (!url || typeof url !== "string") return DEFAULT_URL;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+    return trimmed;
+  }
+  logger.warn(
+    `[LLM] NVIDIA_BASE_URL "${trimmed}" is not a valid URL (it looks like a model name). Using "${DEFAULT_URL}" instead.`
+  );
+  return DEFAULT_URL;
+};
+
+const NVIDIA_BASE_URL = sanitizeBaseUrl(process.env.NVIDIA_BASE_URL);
 
 // Active, verified production models on NVIDIA NIM (integrate.api.nvidia.com)
 const DEFAULT_CHAT_MODEL = process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
@@ -86,40 +99,42 @@ export const embedText = async (text, inputType = "query") => {
     throw new Error("NVIDIA_API_KEY is not configured for embeddings");
   }
 
-  const primaryModel = process.env.NVIDIA_EMBEDDING_MODEL || "nvidia/nv-embedqa-e5-v5";
-  const fallbackModels = ["baai/bge-m3", "nvidia/llama-3.2-nv-embedqa-1b"];
+  const configuredModel = (process.env.NVIDIA_EMBEDDING_MODEL || "").trim();
+  const candidateModels = Array.from(
+    new Set(
+      [
+        configuredModel,
+        configuredModel && !configuredModel.includes("/")
+          ? `nvidia/${configuredModel}`
+          : null,
+        "nvidia/nv-embedqa-e5-v5",
+        "baai/bge-m3",
+        "nvidia/llama-3.2-nv-embedqa-1b",
+        "nvidia/nemotron-3-embed-1b",
+      ].filter(Boolean)
+    )
+  );
 
-  const tryEmbed = async (model) => {
-    const response = await nvidiaEmbeddingClient.embeddings.create({
-      model,
-      input: text.slice(0, 8000),
-      input_type: inputType,
-      encoding_format: "float",
-    });
+  for (const model of candidateModels) {
+    try {
+      const response = await nvidiaEmbeddingClient.embeddings.create({
+        model,
+        input: text.slice(0, 8000),
+        input_type: inputType,
+        encoding_format: "float",
+      });
 
-    let embedding = response.data[0].embedding;
-    if (embedding.length > 1024) {
-      embedding = embedding.slice(0, 1024);
-    }
-    return embedding;
-  };
-
-  try {
-    return await tryEmbed(primaryModel);
-  } catch (err) {
-    logger.warn(`[Embeddings] NVIDIA embedding failed with primary model "${primaryModel}" (${err.message}), trying fallbacks...`);
-    
-    for (const fallbackModel of fallbackModels) {
-      if (fallbackModel === primaryModel) continue;
-      try {
-        const embedding = await tryEmbed(fallbackModel);
-        logger.info(`[Embeddings] NVIDIA embedding succeeded with fallback model "${fallbackModel}"`);
-        return embedding;
-      } catch (fallbackErr) {
-        logger.warn(`[Embeddings] Fallback model "${fallbackModel}" failed: ${fallbackErr.message}`);
+      let embedding = response.data[0].embedding;
+      if (embedding.length > 1024) {
+        embedding = embedding.slice(0, 1024);
       }
+      return embedding;
+    } catch (err) {
+      logger.warn(
+        `[Embeddings] Model "${model}" failed (${err.message}), trying next candidate...`
+      );
     }
-
-    throw new Error(`All NVIDIA embedding models failed: ${err.message}`);
   }
+
+  throw new Error("All NVIDIA embedding models failed to generate embedding");
 };
