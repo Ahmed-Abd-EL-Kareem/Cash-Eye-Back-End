@@ -76,7 +76,7 @@ export const bookingLLM = new ChatOpenAI({
   temperature: 0.5,
   maxTokens: 2000,
   apiKey: NVIDIA_API_KEY,
-  maxRetries: 4,
+  maxRetries: 2,
   timeout: 35_000,
   configuration: {
     baseURL: NVIDIA_BASE_URL,
@@ -89,7 +89,20 @@ export const tripLLM = new ChatOpenAI({
   temperature: 0.6,
   maxTokens: 3500,
   apiKey: NVIDIA_API_KEY,
-  maxRetries: 4,
+  maxRetries: 1,
+  timeout: 45_000,
+  configuration: {
+    baseURL: NVIDIA_BASE_URL,
+  },
+});
+
+// Resilient fallback trip model in case primary model experiences congestion/timeouts
+export const fallbackTripLLM = new ChatOpenAI({
+  model: "nvidia/llama-3.1-nemotron-70b-instruct",
+  temperature: 0.6,
+  maxTokens: 3500,
+  apiKey: NVIDIA_API_KEY,
+  maxRetries: 1,
   timeout: 45_000,
   configuration: {
     baseURL: NVIDIA_BASE_URL,
