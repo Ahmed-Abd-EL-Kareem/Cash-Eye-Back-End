@@ -19,10 +19,10 @@ if (!GEMINI_API_KEY) {
 
 const safeApiKey = GEMINI_API_KEY || "missing-gemini-api-key";
 
-const DEFAULT_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
-const DEFAULT_STRUCTURED_MODEL = process.env.GEMINI_STRUCTURED_MODEL || "gemini-2.5-flash";
-const DEFAULT_BOOKING_MODEL = process.env.GEMINI_BOOKING_MODEL || "gemini-2.5-flash";
-const DEFAULT_TRIP_MODEL = process.env.GEMINI_TRIP_MODEL || "gemini-2.5-flash";
+const DEFAULT_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash";
+const DEFAULT_STRUCTURED_MODEL = process.env.GEMINI_STRUCTURED_MODEL || "gemini-3.6-flash";
+const DEFAULT_BOOKING_MODEL = process.env.GEMINI_BOOKING_MODEL || "gemini-3.6-flash";
+const DEFAULT_TRIP_MODEL = process.env.GEMINI_TRIP_MODEL || "gemini-3.6-flash";
 
 // ── Chat model (Google Gemini) ───────────────────────────────────────────────
 export const chatLLM = new ChatGoogleGenerativeAI({
@@ -63,10 +63,13 @@ const candidateTripModels = Array.from(
   new Set(
     [
       DEFAULT_TRIP_MODEL,
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
+      "gemini-3.6-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash-002",
+      "gemini-1.5-flash-001",
+      "gemini-2.0-flash-001",
+      "gemini-1.5-pro-latest",
+      "gemini-1.5-pro-002",
     ].filter(Boolean)
   )
 );
