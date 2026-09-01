@@ -89,25 +89,62 @@ export const tripLLM = new ChatOpenAI({
   temperature: 0.6,
   maxTokens: 3500,
   apiKey: NVIDIA_API_KEY,
-  maxRetries: 1,
-  timeout: 45_000,
+  maxRetries: 0,
+  timeout: 35_000,
   configuration: {
     baseURL: NVIDIA_BASE_URL,
   },
 });
 
-// Resilient fallback trip model in case primary model experiences congestion/timeouts
-export const fallbackTripLLM = new ChatOpenAI({
-  model: "nvidia/llama-3.1-nemotron-70b-instruct",
-  temperature: 0.6,
-  maxTokens: 3500,
-  apiKey: NVIDIA_API_KEY,
-  maxRetries: 1,
-  timeout: 45_000,
-  configuration: {
-    baseURL: NVIDIA_BASE_URL,
-  },
-});
+// Candidate models for trip planning (ordered by speed, structure capability, and availability)
+const candidateTripModels = Array.from(
+  new Set(
+    [
+      DEFAULT_TRIP_MODEL,
+      "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "nvidia/llama-3.1-nemotron-70b-instruct",
+      "deepseek-ai/deepseek-v4-flash-0731",
+      "mistralai/mistral-large-2-instruct",
+      "mistralai/mistral-7b-instruct-v0.3",
+    ].filter(Boolean)
+  )
+);
+
+/**
+ * Invokes LLM for trip generation with automatic failover across active NVIDIA models.
+ * @param {Array} messages - LangChain messages array
+ */
+export const invokeTripPlanner = async (messages) => {
+  let lastError = null;
+
+  for (const model of candidateTripModels) {
+    try {
+      logger.info(`[TripPlanner] Invoking model "${model}"...`);
+      const llm = new ChatOpenAI({
+        model,
+        temperature: 0.6,
+        maxTokens: 3500,
+        apiKey: NVIDIA_API_KEY,
+        maxRetries: 0,
+        timeout: 35_000,
+        configuration: {
+          baseURL: NVIDIA_BASE_URL,
+        },
+      });
+
+      const response = await llm.invoke(messages);
+      logger.info(`[TripPlanner] Invocation succeeded with model "${model}"`);
+      return response;
+    } catch (err) {
+      lastError = err;
+      logger.warn(
+        `[TripPlanner] Model "${model}" failed (${err.message}), trying next candidate...`
+      );
+    }
+  }
+
+  throw lastError || new Error("All candidate trip models failed to generate response");
+};
 
 // ── NVIDIA Embedding Client ───────────────────────────────────────────────────
 const nvidiaEmbeddingClient = NVIDIA_EMBEDDING_API_KEY

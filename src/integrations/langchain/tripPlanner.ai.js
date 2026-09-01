@@ -1002,7 +1002,7 @@
 import { StateGraph, Annotation, END } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { tripLLM, fallbackTripLLM } from "./llm.client.js";
+import { invokeTripPlanner } from "./llm.client.js";
 import { retrieveContext } from "./rag.retriever.js";
 import { TRIP_PLANNER_SYSTEM } from "./agent.prompts.js";
 import logger from "../../config/logger.js";
@@ -1199,21 +1199,13 @@ async function plannerNode(state) {
 
   let response;
   try {
-    response = await tripLLM.invoke([
+    response = await invokeTripPlanner([
       new SystemMessage(systemContent),
       new HumanMessage(userPrompt),
     ]);
   } catch (err) {
-    logger.warn(`[TripPlanner] Primary trip model failed (${err.message}), trying fallback model...`);
-    try {
-      response = await fallbackTripLLM.invoke([
-        new SystemMessage(systemContent),
-        new HumanMessage(userPrompt),
-      ]);
-    } catch (fallbackErr) {
-      logger.error(`[TripPlanner] All LLM invocations failed: ${fallbackErr.message}`);
-      throw fallbackErr;
-    }
+    logger.error(`[TripPlanner] All LLM invocations failed: ${err.message}`);
+    throw err;
   }
 
   const tokensUsed = (response.usage_metadata?.total_tokens || 0) + state.tokensUsed;
