@@ -1008,6 +1008,67 @@ import { TRIP_PLANNER_SYSTEM } from "./agent.prompts.js";
 import logger from "../../config/logger.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const repairTruncatedJson = (raw) => {
+  if (!raw || typeof raw !== "string") return null;
+  let str = raw.trim();
+  const startIdx = str.indexOf("{");
+  if (startIdx === -1) return null;
+  str = str.slice(startIdx);
+  str = str.replace(/```+$/, "").trim();
+
+  // Try direct parse first
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    // Continue with progressive repair
+  }
+
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === "{") openBraces++;
+      else if (char === "}") openBraces = Math.max(0, openBraces - 1);
+      else if (char === "[") openBrackets++;
+      else if (char === "]") openBrackets = Math.max(0, openBrackets - 1);
+    }
+  }
+
+  if (inString) str += '"';
+  str = str.replace(/,\s*$/, "");
+
+  while (openBrackets > 0) {
+    str += "]";
+    openBrackets--;
+  }
+  while (openBraces > 0) {
+    str += "}";
+    openBraces--;
+  }
+
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    return null;
+  }
+};
+
 const safeJsonParse = (raw) => {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { /* */ }
@@ -1015,7 +1076,7 @@ const safeJsonParse = (raw) => {
   if (fenced) { try { return JSON.parse(fenced[1]); } catch { /* */ } }
   const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
   if (s !== -1 && e > s) { try { return JSON.parse(raw.slice(s, e + 1)); } catch { /* */ } }
-  return null;
+  return repairTruncatedJson(raw);
 };
 
 const toLocalizedString = (val, fallback = "") => {
@@ -1143,26 +1204,40 @@ const State = Annotation.Root({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE 1: RAG RETRIEVAL
-// Fetches destination + hotel knowledge from Pinecone
+// Fetches destination + hotel knowledge from Upstash with 1.5s timeout
 // ─────────────────────────────────────────────────────────────────────────────
 async function ragNode(state) {
   logger.info(`[TripPlanner] RAG retrieval for "${state.destination}"`);
 
-  const query = [
-    state.destination,
-    "Egypt travel attractions hotels",
-    ...state.interests,
-  ].join(" ");
+  let ragContext = null;
+  try {
+    const query = [
+      state.destination,
+      "Egypt travel attractions",
+      ...(state.interests || []),
+    ].join(" ");
 
-  const ragContext = await retrieveContext(query, 5);
-  logger.info(`[TripPlanner] RAG: ${ragContext ? `${ragContext.length} chars` : "no results"}`);
+    const ragPromise = retrieveContext(query, 3);
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve(null), 1500)
+    );
+    ragContext = await Promise.race([ragPromise, timeoutPromise]);
+  } catch (err) {
+    logger.warn(`[TripPlanner] RAG error or timeout: ${err.message}`);
+  }
+
+  logger.info(
+    `[TripPlanner] RAG: ${
+      ragContext ? `${ragContext.length} chars` : "no results / skipped"
+    }`
+  );
 
   return { ragContext };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE 2: PLANNER
-// Calls the LLM to produce a structured, BILINGUAL JSON itinerary
+// Calls the LLM to produce a structured, concise BILINGUAL JSON itinerary (< 10s)
 // ─────────────────────────────────────────────────────────────────────────────
 async function plannerNode(state) {
   logger.info(
@@ -1179,23 +1254,13 @@ async function plannerNode(state) {
   const interestsList =
     state.interests.length > 0 ? state.interests.join(", ") : "general sightseeing";
 
-  // On retry, add explicit correction instruction
-  const retryHint =
-    state.retryCount > 0
-      ? "\n\nIMPORTANT: Your previous response was invalid — either the JSON " +
-      "didn't parse or some field was missing its 'en'/'ar' pair. " +
-      "Return ONLY a raw JSON object — no markdown, no backticks, no preamble — " +
-      "and make sure EVERY text field has both 'en' and 'ar' filled in."
-      : "";
-
   const userPrompt =
-    `Generate BOTH English and Arabic content for the same trip plan — every ` +
-    `field needs its { en, ar } pair, in a single response.${retryHint}\n\n` +
-    `Generate a ${state.duration}-day trip plan for:\n` +
+    `Generate a concise ${state.duration}-day bilingual trip plan for:\n` +
     `- Destination: ${state.destination}, Egypt\n` +
     `- Budget: ${budgetLabel(state.budget)}\n` +
     `- Travelers: ${state.travelers}\n` +
-    `- Interests: ${interestsList}`;
+    `- Interests: ${interestsList}\n\n` +
+    `CRITICAL: Keep activity/meal descriptions short (under 15 words). Return ONLY valid JSON with { en, ar } bilingual strings.`;
 
   let response;
   try {
@@ -1211,14 +1276,6 @@ async function plannerNode(state) {
   const tokensUsed = (response.usage_metadata?.total_tokens || 0) + state.tokensUsed;
   logger.info(`[TripPlanner] LLM done — ${tokensUsed} total tokens`);
 
-  // Normalize response.content → plain string regardless of the underlying
-  // API format. NVIDIA/OpenAI returns a plain string. The Anthropic API
-  // (used via the student proxy in llm.client.js) returns an array of
-  // content blocks: [{ type: "text", text: "..." }, ...].
-  // Passing an array to safeJsonParse causes JSON.parse to succeed on the
-  // array itself (not the JSON inside the text block), producing a corrupt
-  // plan that bypasses isValidPlan and then crashes Mongoose with CastError
-  // on every localized field.
   const rawOutput = Array.isArray(response.content)
     ? response.content
       .filter((b) => b?.type === "text")
@@ -1233,33 +1290,35 @@ async function plannerNode(state) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODE 3: VALIDATOR
-// Parses the JSON and validates its bilingual shape; sets plan or error
+// Parses JSON with auto-repair and normalizes bilingual shape
 // ─────────────────────────────────────────────────────────────────────────────
 async function validatorNode(state) {
   const parsed = safeJsonParse(state.rawOutput);
   const normalized = normalizePlan(parsed, state.destination);
 
-  if (normalized && (isValidPlan(normalized) || (Array.isArray(normalized.days) && normalized.days.length > 0))) {
+  if (normalized && Array.isArray(normalized.days) && normalized.days.length > 0) {
     const titleEn = normalized.title?.en || normalized.title || "Trip Plan";
     const titleAr = normalized.title?.ar || normalized.title || "خطة الرحلة";
-    logger.info(`[TripPlanner] Plan validated: "${titleEn}" / "${titleAr}" (${normalized.days.length} days)`);
+    logger.info(
+      `[TripPlanner] Plan validated: "${titleEn}" / "${titleAr}" (${normalized.days.length} days)`
+    );
     return { plan: normalized, error: null };
   }
 
   logger.warn(`[TripPlanner] Validation failed (attempt ${state.retryCount + 1})`);
 
-  if (state.retryCount < 1) {
-    // Signal retry — retryCount increment handled by the edge
-    return { plan: null, retryCount: state.retryCount + 1 };
+  // Salvage normalized plan if any days parsed
+  if (normalized && normalized.days?.length > 0) {
+    return { plan: normalized, error: null };
   }
 
-  if (normalized) {
-    return { plan: normalized, error: null };
+  if (state.retryCount < 1) {
+    return { plan: null, retryCount: state.retryCount + 1 };
   }
 
   return {
     plan: null,
-    error: "Failed to generate a valid bilingual trip plan after retrying. Please try again.",
+    error: "Failed to generate a valid bilingual trip plan. Please try again.",
   };
 }
 
