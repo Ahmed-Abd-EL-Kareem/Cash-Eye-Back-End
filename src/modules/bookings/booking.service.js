@@ -243,12 +243,20 @@ export const createBooking = async (userId, data) => {
   const hotel = await HotelModel.findById(data.hotel);
   if (!hotel || !hotel.isActive) throw new ApiError("Hotel not found", 404);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const checkIn = new Date(data.checkIn);
   const checkOut = new Date(data.checkOut);
 
-  if (checkIn < new Date()) throw new ApiError("checkIn must be a future date", 400);
+  const checkInDateOnly = new Date(checkIn);
+  checkInDateOnly.setHours(0, 0, 0, 0);
+
+  if (isNaN(checkIn.getTime())) throw new ApiError("Please provide a valid check-in date.", 400);
+  if (isNaN(checkOut.getTime())) throw new ApiError("Please provide a valid check-out date.", 400);
+  if (checkInDateOnly < today) throw new ApiError("Check-in date cannot be in the past. Please select today or a future date.", 400);
   const nights = calculateNights(checkIn, checkOut);
-  if (nights <= 0) throw new ApiError("checkOut must be after checkIn", 400);
+  if (nights <= 0) throw new ApiError("Check-out date must be after check-in date. Minimum stay is 1 night.", 400);
 
   // Support both new format (rooms array) and flexible/legacy format (room + rooms qty + guests)
   let roomSelections = [];

@@ -15,7 +15,7 @@ export const seedPlans = async () => {
           tripsPerMonth: 3,
           maxFileUploads: 0,
           maxFileSizeMB: 0,
-          allowedModels: ["nvidia/nemotron-3-super-120b-a12b", "gpt-4o-mini"],
+          allowedModels: ["nvidia/llama-3.1-nemotron-70b-instruct", "gpt-4o-mini"],
         },
         features: [
           "3 AI trip plans per month",
@@ -38,7 +38,7 @@ export const seedPlans = async () => {
           tripsPerMonth: null,
           maxFileUploads: 10,
           maxFileSizeMB: 10,
-          allowedModels: ["nvidia/nemotron-3-super-120b-a12b", "gpt-4o-mini", "gpt-4", "gpt-4-turbo"],
+          allowedModels: ["nvidia/llama-3.1-nemotron-70b-instruct", "gpt-4o-mini", "gpt-4", "gpt-4-turbo"],
         },
         features: [
           "Unlimited AI trip plans",
