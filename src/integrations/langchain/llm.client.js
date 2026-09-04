@@ -95,149 +95,257 @@ const GEMINI_DEFAULT_MODEL = sanitizeGeminiModel(process.env.GEMINI_CHAT_MODEL);
 const NVIDIA_DEFAULT_MODEL =
   process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
 
-const createLLM = ({
+/**
+ * Creates a high-availability resilient LLM wrapper that automatically falls back
+ * across providers (Gemini <-> NVIDIA NIM) if a 503 / 429 / spike occurs.
+ */
+const createResilientLLM = ({
   geminiModel,
   nvidiaModel,
   temperature = 0.5,
   maxTokens = 1500,
-  timeout = 25000,
+  timeout = 20000,
+  label = "LLM",
 }) => {
-  if (USE_GEMINI) {
-    return new ChatGoogleGenerativeAI({
-      model: sanitizeGeminiModel(geminiModel || GEMINI_DEFAULT_MODEL),
-      temperature,
-      maxOutputTokens: maxTokens,
-      apiKey: safeGeminiKey,
-      maxRetries: 0,
-    });
-  }
+  const geminiLLM = GEMINI_API_KEY
+    ? new ChatGoogleGenerativeAI({
+        model: sanitizeGeminiModel(geminiModel || GEMINI_DEFAULT_MODEL),
+        temperature,
+        maxOutputTokens: maxTokens,
+        apiKey: safeGeminiKey,
+        maxRetries: 0,
+      })
+    : null;
 
-  return new ChatOpenAI({
-    model: nvidiaModel || NVIDIA_DEFAULT_MODEL,
-    temperature,
-    maxTokens,
-    apiKey: safeNvidiaKey,
-    maxRetries: 0,
-    timeout,
-    configuration: {
-      baseURL: NVIDIA_BASE_URL,
+  const nvidiaLLM = NVIDIA_API_KEY
+    ? new ChatOpenAI({
+        model: nvidiaModel || NVIDIA_DEFAULT_MODEL,
+        temperature,
+        maxTokens,
+        apiKey: safeNvidiaKey,
+        maxRetries: 0,
+        timeout,
+        configuration: {
+          baseURL: NVIDIA_BASE_URL,
+        },
+      })
+    : null;
+
+  const primary = USE_GEMINI ? geminiLLM || nvidiaLLM : nvidiaLLM || geminiLLM;
+  const fallback = USE_GEMINI ? nvidiaLLM : geminiLLM;
+
+  return {
+    ...primary,
+    invoke: async (messages, options) => {
+      let lastErr = null;
+
+      if (primary) {
+        try {
+          return await primary.invoke(messages, options);
+        } catch (err) {
+          lastErr = err;
+          logger.warn(
+            `[${label}] Primary provider failed (${err.message}). Trying fallback provider...`
+          );
+        }
+      }
+
+      if (fallback && fallback !== primary) {
+        try {
+          const resp = await fallback.invoke(messages, options);
+          logger.info(`[${label}] Fallback provider succeeded!`);
+          return resp;
+        } catch (fallbackErr) {
+          lastErr = fallbackErr;
+          logger.error(`[${label}] Fallback provider failed: ${fallbackErr.message}`);
+        }
+      }
+
+      throw lastErr || new Error(`All configured AI providers failed for ${label}`);
     },
-  });
+    bindTools: (tools) => {
+      if (primary && typeof primary.bindTools === "function") {
+        const boundPrimary = primary.bindTools(tools);
+        const boundFallback =
+          fallback && typeof fallback.bindTools === "function"
+            ? fallback.bindTools(tools)
+            : null;
+
+        return {
+          ...boundPrimary,
+          invoke: async (messages, options) => {
+            try {
+              return await boundPrimary.invoke(messages, options);
+            } catch (err) {
+              if (boundFallback) {
+                logger.warn(
+                  `[${label}.bindTools] Primary failed (${err.message}), trying fallback...`
+                );
+                return await boundFallback.invoke(messages, options);
+              }
+              throw err;
+            }
+          },
+        };
+      }
+      throw new Error(`bindTools is not supported by configured models for ${label}`);
+    },
+  };
 };
 
 // ── Shared Agent LLM Instances ───────────────────────────────────────────────
-export const chatLLM = createLLM({
+export const chatLLM = createResilientLLM({
   geminiModel: process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash",
   nvidiaModel: process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct",
   temperature: 0.5,
   maxTokens: 1200,
   timeout: 20000,
+  label: "ChatAgent",
 });
 
-export const structuredLLM = createLLM({
+export const structuredLLM = createResilientLLM({
   geminiModel: process.env.GEMINI_STRUCTURED_MODEL || "gemini-3.6-flash",
   nvidiaModel:
     process.env.NVIDIA_STRUCTURED_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct",
   temperature: 0.2,
   maxTokens: 1500,
   timeout: 20000,
+  label: "StructuredExtractor",
 });
 
-export const bookingLLM = createLLM({
+export const bookingLLM = createResilientLLM({
   geminiModel: process.env.GEMINI_BOOKING_MODEL || "gemini-3.6-flash",
   nvidiaModel: process.env.NVIDIA_BOOKING_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct",
   temperature: 0.5,
   maxTokens: 1800,
   timeout: 22000,
+  label: "BookingAgent",
 });
 
-export const tripLLM = createLLM({
+export const tripLLM = createResilientLLM({
   geminiModel: process.env.GEMINI_TRIP_MODEL || "gemini-3.6-flash",
   nvidiaModel: process.env.NVIDIA_TRIP_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct",
   temperature: 0.6,
   maxTokens: 2500,
   timeout: 25000,
+  label: "TripPlanner",
 });
 
-// Candidate models for trip planning failover
-const candidateGeminiModels = Array.from(
-  new Set(
-    [
-      process.env.GEMINI_TRIP_MODEL,
-      "gemini-3.6-flash",
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash-002",
-      "gemini-2.0-flash-001",
-    ]
-      .map(sanitizeGeminiModel)
-      .filter(Boolean)
-  )
-);
-
-const candidateNvidiaModels = Array.from(
-  new Set(
-    [
-      process.env.NVIDIA_TRIP_MODEL,
-      "deepseek-ai/deepseek-v4-flash-0731",
-      "nvidia/nemotron-3.5-lightning-30b-a3b",
-      "nvidia/llama-3.1-nemotron-70b-instruct",
-      "mistralai/mistral-large-2-instruct",
-    ].filter(Boolean)
-  )
-);
-
 /**
- * Invokes LLM for trip generation with automatic failover and strict 22s timeout.
+ * Invokes LLM for trip generation with cross-provider failover (Gemini <-> NVIDIA NIM)
+ * and automatic 503 high-demand retry so requests never fail during demand spikes.
  * @param {Array} messages - LangChain messages array
  */
 export const invokeTripPlanner = async (messages) => {
-  const candidates = USE_GEMINI ? candidateGeminiModels : candidateNvidiaModels;
+  const geminiAvailable = Boolean(GEMINI_API_KEY);
+  const nvidiaAvailable = Boolean(NVIDIA_API_KEY);
+
+  const geminiCandidates = geminiAvailable
+    ? [
+        {
+          provider: "gemini",
+          model: sanitizeGeminiModel(process.env.GEMINI_TRIP_MODEL || "gemini-3.6-flash"),
+        },
+        // In case of a temporary 503 high-demand spike on Gemini, retry once after a short pause
+        {
+          provider: "gemini",
+          model: "gemini-3.6-flash",
+          delayMs: 1200,
+        },
+      ]
+    : [];
+
+  const nvidiaCandidates = nvidiaAvailable
+    ? [
+        {
+          provider: "nvidia",
+          model: process.env.NVIDIA_TRIP_MODEL || "deepseek-ai/deepseek-v4-flash-0731",
+        },
+        {
+          provider: "nvidia",
+          model: "nvidia/llama-3.1-nemotron-70b-instruct",
+        },
+        {
+          provider: "nvidia",
+          model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+        },
+      ]
+    : [];
+
+  // Order candidates by preferred provider, but ALWAYS fall back across providers!
+  const candidates = USE_GEMINI
+    ? [...geminiCandidates, ...nvidiaCandidates]
+    : [...nvidiaCandidates, ...geminiCandidates];
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "No AI providers available. Please set GEMINI_API_KEY or NVIDIA_API_KEY in your environment."
+    );
+  }
+
   let lastError = null;
 
-  for (const model of candidates) {
+  for (const candidate of candidates) {
+    const { provider, model, delayMs } = candidate;
+
+    if (delayMs) {
+      logger.info(
+        `[TripPlanner] Pausing ${delayMs}ms before retrying ${provider} model "${model}"...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
     try {
       logger.info(
         `[TripPlanner] Invoking ${
-          USE_GEMINI ? "Gemini" : "NVIDIA"
+          provider === "gemini" ? "Google Gemini" : "NVIDIA NIM"
         } model "${model}"...`
       );
 
-      const llm = USE_GEMINI
-        ? new ChatGoogleGenerativeAI({
-            model,
-            temperature: 0.6,
-            maxOutputTokens: 2500,
-            apiKey: safeGeminiKey,
-            maxRetries: 0,
-          })
-        : new ChatOpenAI({
-            model,
-            temperature: 0.6,
-            maxTokens: 2500,
-            apiKey: safeNvidiaKey,
-            maxRetries: 0,
-            timeout: 22000,
-            configuration: {
-              baseURL: NVIDIA_BASE_URL,
-            },
-          });
+      const llm =
+        provider === "gemini"
+          ? new ChatGoogleGenerativeAI({
+              model,
+              temperature: 0.6,
+              maxOutputTokens: 2500,
+              apiKey: safeGeminiKey,
+              maxRetries: 0,
+            })
+          : new ChatOpenAI({
+              model,
+              temperature: 0.6,
+              maxTokens: 2500,
+              apiKey: safeNvidiaKey,
+              maxRetries: 0,
+              timeout: 20000,
+              configuration: {
+                baseURL: NVIDIA_BASE_URL,
+              },
+            });
 
-      // Strict 22-second timeout per model so total request stays under 30s
+      // Strict 20-second timeout per candidate to ensure response under 30s
       const invocationPromise = llm.invoke(messages);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
-          () => reject(new Error(`Model "${model}" timed out after 22 seconds`)),
-          22000
+          () =>
+            reject(
+              new Error(
+                `${provider} model "${model}" timed out after 20 seconds`
+              )
+            ),
+          20000
         )
       );
 
       const response = await Promise.race([invocationPromise, timeoutPromise]);
-      logger.info(`[TripPlanner] Invocation succeeded with model "${model}"`);
+      logger.info(
+        `[TripPlanner] Invocation succeeded with ${provider} model "${model}"`
+      );
       return response;
     } catch (err) {
       lastError = err;
       logger.warn(
-        `[TripPlanner] Model "${model}" failed or timed out (${err.message}), trying next candidate...`
+        `[TripPlanner] ${provider} model "${model}" failed or timed out (${err.message}), trying next candidate...`
       );
     }
   }
