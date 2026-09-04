@@ -90,10 +90,49 @@ if (!USE_GEMINI && !NVIDIA_API_KEY) {
 
 const safeNvidiaKey = NVIDIA_API_KEY || "missing-nvidia-api-key";
 
+// ── Content Normalization Helper ─────────────────────────────────────────────
+/**
+ * Normalizes any LLM response content (string, array of text blocks, object)
+ * into a single clean string. Prevents Mongoose CastError on string schemas.
+ */
+export const normalizeContentText = (content, fallback = "") => {
+  if (content == null) return fallback;
+  if (typeof content === "string") return content.trim() || fallback;
+  if (Array.isArray(content)) {
+    const combined = content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          if (typeof part.text === "string") return part.text;
+          if (typeof part.content === "string") return part.content;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    return combined || fallback;
+  }
+  if (typeof content === "object") {
+    if (typeof content.text === "string") return content.text.trim() || fallback;
+    if (typeof content.content === "string") return content.content.trim() || fallback;
+  }
+  return String(content).trim() || fallback;
+};
+
+const ensureNormalizedResponse = (res) => {
+  if (!res) return res;
+  if (res.content !== undefined) {
+    res.content = normalizeContentText(res.content);
+  }
+  return res;
+};
+
 // ── Model Selection (Configurable per provider) ──────────────────────────────
+// Default to fast low-latency models on NVIDIA NIM (flash) to avoid 20s timeouts
 const GEMINI_DEFAULT_MODEL = sanitizeGeminiModel(process.env.GEMINI_CHAT_MODEL);
 const NVIDIA_DEFAULT_MODEL =
-  process.env.NVIDIA_CHAT_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+  process.env.NVIDIA_CHAT_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
 
 /**
  * Creates a high-availability resilient LLM wrapper that automatically falls back
@@ -141,7 +180,8 @@ const createResilientLLM = ({
 
       if (primary) {
         try {
-          return await primary.invoke(messages, options);
+          const resp = await primary.invoke(messages, options);
+          return ensureNormalizedResponse(resp);
         } catch (err) {
           lastErr = err;
           logger.warn(
@@ -154,7 +194,7 @@ const createResilientLLM = ({
         try {
           const resp = await fallback.invoke(messages, options);
           logger.info(`[${label}] Fallback provider succeeded!`);
-          return resp;
+          return ensureNormalizedResponse(resp);
         } catch (fallbackErr) {
           lastErr = fallbackErr;
           logger.error(`[${label}] Fallback provider failed: ${fallbackErr.message}`);
@@ -175,13 +215,15 @@ const createResilientLLM = ({
           ...boundPrimary,
           invoke: async (messages, options) => {
             try {
-              return await boundPrimary.invoke(messages, options);
+              const resp = await boundPrimary.invoke(messages, options);
+              return ensureNormalizedResponse(resp);
             } catch (err) {
               if (boundFallback) {
                 logger.warn(
                   `[${label}.bindTools] Primary failed (${err.message}), trying fallback...`
                 );
-                return await boundFallback.invoke(messages, options);
+                const resp = await boundFallback.invoke(messages, options);
+                return ensureNormalizedResponse(resp);
               }
               throw err;
             }
@@ -341,7 +383,7 @@ export const invokeTripPlanner = async (messages) => {
       logger.info(
         `[TripPlanner] Invocation succeeded with ${provider} model "${model}"`
       );
-      return response;
+      return ensureNormalizedResponse(response);
     } catch (err) {
       lastError = err;
       logger.warn(

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { chatWithRahal } from "./chat.ai.js";
+import { normalizeContentText } from "./llm.client.js";
 import { ChatConversation } from "../../modules/ai/chatConversation.model.js";
 import logger from "../../config/logger.js";
 
@@ -55,10 +56,15 @@ export const sendChatMessage = async ({ userId, sessionId, message }) => {
     { role: "user", content: message },
   ]);
 
-  // Add assistant message
+  // Add assistant message (guarantee string type to prevent Mongoose CastError)
+  const assistantReply = normalizeContentText(
+    reply,
+    "I am here to assist you with your travels in Egypt. How can I help you today?"
+  );
+
   conversation.messages.push({
     role: "assistant",
-    content: reply,
+    content: assistantReply,
     tokensUsed: tokensUsed || 0,
   });
 

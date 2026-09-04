@@ -10,6 +10,24 @@ const chatMessageSchema = new mongoose.Schema(
     content: {
       type: String,
       required: true,
+      set: (val) => {
+        if (typeof val === "string") return val;
+        if (Array.isArray(val)) {
+          const text = val
+            .map((p) => {
+              if (typeof p === "string") return p;
+              if (p && typeof p === "object") return p.text || p.content || "";
+              return "";
+            })
+            .filter(Boolean)
+            .join("\n");
+          return text || "No response content";
+        }
+        if (val && typeof val === "object") {
+          return val.text || val.content || JSON.stringify(val);
+        }
+        return String(val || "");
+      },
     },
     tokensUsed: {
       type: Number,

@@ -769,7 +769,7 @@ import { StateGraph, Annotation, END } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
-import { chatLLM, structuredLLM } from "./llm.client.js";
+import { chatLLM, structuredLLM, normalizeContentText } from "./llm.client.js";
 import { retrieveContext } from "./rag.retriever.js";
 import {
   ragTool,
@@ -946,7 +946,12 @@ async function chatNode(state) {
   const tokensUsed = response.usage_metadata?.total_tokens || 0;
   logger.info(`[Chat Agent] Done — ${tokensUsed} tokens`);
 
-  return { agentUsed: "chat", reply: response.content, tokensUsed };
+  const reply = normalizeContentText(
+    response.content,
+    "I'm here to help you plan your journey in Egypt! What would you like to know?"
+  );
+
+  return { agentUsed: "chat", reply, tokensUsed };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1016,7 +1021,10 @@ async function hotelSearchNode(state) {
 
   return {
     agentUsed: "hotel_search",
-    reply: response.content,
+    reply: normalizeContentText(
+      response.content,
+      "Here are the hotels found matching your search in Egypt."
+    ),
     tokensUsed,
     hotelIds,
   };
@@ -1094,7 +1102,10 @@ ${languageInstruction} Recommend these hotels warmly in plain language, explaini
 
   return {
     agentUsed: "recommendations",
-    reply: response.content,
+    reply: normalizeContentText(
+      response.content,
+      "Here are our top recommended accommodations for your stay in Egypt."
+    ),
     tokensUsed,
     hotelIds,
   };
